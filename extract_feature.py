@@ -166,3 +166,4 @@ if __name__ == '__main__':
                                             volatile=True)
         rst = np.squeeze(net(input_var).data.cpu().numpy().copy())
         pkl.dump(rst, open(ft_path, "wb"))
+    print("Done with feature extraction")

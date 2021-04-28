@@ -60,3 +60,5 @@ if __name__ == '__main__':
     with Pool(args.num_worker) as p:
         p.map(partial(cal_for_frames, output_dir=output_dir, 
                     width=width, height=height), video_paths)
+
+    print("Optical flow extraction completed")

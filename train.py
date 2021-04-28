@@ -19,7 +19,7 @@ from config import _C as config
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-
+from tqdm import tqdm
 
 def prepare_dataloaders():
     # Get data, data loaders and collate function ready
@@ -31,6 +31,10 @@ def prepare_dataloaders():
                               drop_last=True)
     test_loader = DataLoader(valset, num_workers=4, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
+    print("Check number of train examples: ", len(trainset))
+    print("Check number of train loader examples: ", len(train_loader))
+    assert(len(trainset) > 0)
+    assert(len(train_loader) > 0)
     return train_loader, test_loader
 
 
@@ -94,9 +98,11 @@ def train():
     config.epoch_count = epoch_offset
     model.setup()
 
+    print(f"Epoch offset: {epoch_offset} for epochs: {config.epochs}")
+
     model.train()
     # ================ MAIN TRAINNIG LOOP! ===================
-    for epoch in range(epoch_offset, config.epochs):
+    for epoch in tqdm(range(epoch_offset, config.epochs)):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
             start = time.perf_counter()
@@ -151,5 +157,6 @@ if __name__ == '__main__':
     print("Dynamic Loss Scaling:", config.dynamic_loss_scaling)
     print("cuDNN Enabled:", config.cudnn_enabled)
     print("cuDNN Benchmark:", config.cudnn_benchmark)
-
+    
+    print("Config being used: \n", config)
     train()

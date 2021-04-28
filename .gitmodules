@@ -1,0 +1,3 @@
+[submodule "temporal-segment-networks"]
+	path = temporal-segment-networks
+	url = git@github.com:yjxiong/temporal-segment-networks.git

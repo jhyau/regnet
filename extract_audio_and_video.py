@@ -67,7 +67,7 @@ if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="data/VAS/dog/videos")
     paser.add_argument("-o", "--output_dir", default="data/features/dog")
-    paser.add_argument("-d", "--duration", type=int, default=10)
+    paser.add_argument("-d", "--duration", type=int, default=600)
     paser.add_argument("-a", '--audio_sample_rate', default='22050')
     paser.add_argument("-v", '--video_fps', default='21.5')
     paser.add_argument("-n", '--num_worker', type=int, default=32)
@@ -84,3 +84,6 @@ if __name__ == '__main__':
     with Pool(args.num_worker) as p:
         p.map(partial(pipline, output_dir=output_dir, 
         sr=sr, fps=fps, duration_target=duration_target), video_paths)
+
+    # Notify when done
+    print("Worker pool is done and closed")

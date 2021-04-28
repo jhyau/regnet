@@ -7,7 +7,7 @@ do
     # Data preprocessing. We will first pad all videos to 10s and change video FPS and audio
     # sampling rate.
     python extract_audio_and_video.py \
-    -i data/VAS/videos/${soundtype} \
+    -i data/VAS/${soundtype}/videos \
     -o data/features/${soundtype}
 
     # Generating RGB frame and optical flow. This script uses CPU to calculate optical flow,
@@ -19,7 +19,7 @@ do
 
     #Split training/testing list
     python gen_list.py \
-    -i data/VAS/videos/${soundtype} \
+    -i data/VAS/${soundtype}/videos \
     -o filelists --prefix ${soundtype}
 
     #Extract Mel-spectrogram from audio
@@ -28,26 +28,26 @@ do
     -o data/features/${soundtype}/melspec_10s_22050hz
 
     #Extract RGB feature
-    CUDA_VISIBLE_DEVICES=6 python extract_feature.py \
+    CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
     -t filelists/${soundtype}_train.txt \
     -m RGB \
     -i data/features/${soundtype}/OF_10s_21.5fps \
     -o data/features/${soundtype}/feature_rgb_bninception_dim1024_21.5fps
 
-    CUDA_VISIBLE_DEVICES=6 python extract_feature.py \
+    CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
     -t filelists/${soundtype}_test.txt \
     -m RGB \
     -i data/features/${soundtype}/OF_10s_21.5fps \
     -o data/features/${soundtype}/feature_rgb_bninception_dim1024_21.5fps
 
     #Extract optical flow feature
-    CUDA_VISIBLE_DEVICES=6 python extract_feature.py \
+    CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
     -t filelists/${soundtype}_train.txt \
     -m Flow \
     -i data/features/${soundtype}/OF_10s_21.5fps \
     -o data/features/${soundtype}/feature_flow_bninception_dim1024_21.5fps
 
-    CUDA_VISIBLE_DEVICES=6 python extract_feature.py \
+    CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
     -t filelists/${soundtype}_test.txt \
     -m Flow \
     -i data/features/${soundtype}/OF_10s_21.5fps \

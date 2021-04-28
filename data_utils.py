@@ -19,6 +19,7 @@ class RegnetLoader(torch.utils.data.Dataset):
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
+        print("Video IDs of dataset: ", self.video_ids)
 
     def get_feature_mel_pair(self, video_id):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
