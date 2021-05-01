@@ -7,7 +7,7 @@ if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="dataset/VEGAS/dog/videos")
     paser.add_argument("-o", "--output_dir", default="filelists")
-    paser.add_argument("-p", "--prefix", default="dog", choices=["dog", "fireworks", "baby", "drum", "gun", "sneeze", "cough", "hammer", "ASMR_1_Hr", "ASMR_3_Hrs"])
+    paser.add_argument("-p", "--prefix", default="dog", choices=["dog", "fireworks", "baby", "drum", "gun", "sneeze", "cough", "hammer", "ASMR_1_Hr", "ASMR_3_Hrs", "ASMR_3_Hrs_fake_audio"])
     args = paser.parse_args()
     input_dir = args.input_dir
     output_dir = args.output_dir
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     
     if args.prefix in ["dog", "fireworks", "baby", "drum"]:
         n_test = 128
-    elif args.prefix in ["ASMR_1_Hr"]:
+    elif args.prefix in ["ASMR_1_Hr", 'ASMR_3_Hrs_fake_audio']:
         n_test = 2
     elif args.prefix in ["ASMR_3_Hrs"]:
         n_test = 4

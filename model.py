@@ -242,10 +242,12 @@ class Regnet_G(nn.Module):
             vis_thr, spec_thr = 0, 1
         else:
             print(self.mode_input)
+        print(f"Mode input for the generator: {self.mode_input}")
         encoder_output = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
         if self.aux_zero:
             gt_auxilitary = gt_auxilitary * 0
+            print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
         encoder_output = torch.cat([encoder_output, gt_auxilitary], dim=2)
         mel_output_decoder = self.decoder(encoder_output)
         mel_output_postnet = self.postnet(mel_output_decoder)

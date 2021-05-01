@@ -67,7 +67,7 @@ if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="data/VAS/dog/videos")
     paser.add_argument("-o", "--output_dir", default="data/features/dog")
-    paser.add_argument("-d", "--duration", type=int, default=600)
+    paser.add_argument("-d", "--duration", type=int, default=15)
     paser.add_argument("-a", '--audio_sample_rate', default='22050')
     paser.add_argument("-v", '--video_fps', default='21.5')
     paser.add_argument("-n", '--num_worker', type=int, default=32)

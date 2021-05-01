@@ -152,7 +152,7 @@ if __name__ == '__main__':
                     ])),
             batch_size=1, shuffle=False,
             num_workers=1, pin_memory=True)
-
+    print("Number of examples in data loader: ", len(data_loader))
     net = torch.nn.DataParallel(net).cuda()
     net.eval()
     for i, (data, video_path) in enumerate(data_loader):
