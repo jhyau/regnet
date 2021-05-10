@@ -38,7 +38,7 @@ if __name__ == '__main__':
     args = paser.parse_args()
     input_dir = args.input_dir
     output_dir = args.output_dir
-    length = args.length
+    length = int(args.length)
 
     audio_paths = glob(P.join(input_dir, "*.wav"))
     audio_paths.sort()

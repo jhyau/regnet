@@ -3,14 +3,18 @@
 soundtype="ASMR_3_Hrs_fake_audio"
 dir_name="fake_audio_Ultimate_Tapping_ASMR_3_Hours_subset"
 duration="15"
+duration_num=15
+mel_duration_num=$((22050 * duration_num))
+echo $mel_duration_num
 #for soundtype in $soundlist 
 #do
 
 # Data preprocessing. We will first pad all videos to 10s and change video FPS and audio
 # sampling rate.
-python extract_audio_and_video.py \
--i data/ASMR/${dir_name} \
--o data/features/ASMR/${dir_name}
+#python extract_audio_and_video.py \
+#-i data/ASMR/${dir_name} \
+#-o data/features/ASMR/${dir_name} \
+#-d ${duration_num}
 
 # Generating RGB frame and optical flow. This script uses CPU to calculate optical flow,
 # which may take a very long time. We strongly recommend you to refer to TSN repository 
@@ -20,14 +24,15 @@ python extract_audio_and_video.py \
 #-o data/features/ASMR/${dir_name}/OF_${duration}s_21.5fps
 
 #Split training/testing list
-python gen_list.py \
--i data/ASMR/${dir_name}  \
--o filelists --prefix ${soundtype}
+#python gen_list.py \
+#-i data/ASMR/${dir_name}  \
+#-o filelists --prefix ${soundtype}
 
 #Extract Mel-spectrogram from audio
-python extract_mel_spectrogram.py \
--i data/features/ASMR/${dir_name}/audio_${duration}s_22050hz \
--o data/features/ASMR/${dir_name}/melspec_${duration}s_22050hz
+#python extract_mel_spectrogram.py \
+#-i data/features/ASMR/${dir_name}/audio_${duration}s_22050hz \
+#-o data/features/ASMR/${dir_name}/melspec_${duration}s_22050hz \
+#-l $mel_duration_num
 
 #Extract RGB feature
 CUDA_VISIBLE_DEVICES=0 python extract_feature.py \

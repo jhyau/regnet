@@ -50,7 +50,7 @@ def gen_waveform(model, save_path, c, device):
     if c.shape[1] != config.n_mel_channels:
         c = np.swapaxes(c, 0, 1)
     length = c.shape[0] * 256
-    print(f"length of the waveform to be generated: {length}")
+    print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
     c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
     with torch.no_grad():
         y_hat = model.incremental_forward(
@@ -81,11 +81,13 @@ def test_model():
                 plt.figure(figsize=(8, 9))
                 plt.subplot(311)
                 # model.real_B is the ground truth spectrogram
+                print(f"ground truth spec size: {model.real_B[j].data.cpu().numpy().shape}")
                 plt.imshow(model.real_B[j].data.cpu().numpy(), 
                                 aspect='auto', origin='lower')
                 plt.title(model.video_name[j]+"_ground_truth")
                 plt.subplot(312)
                 # model.fake_B is the generator's prediction
+                print(f"prediction spec size: {model.fake_B[j].data.cpu().numpy().shape}")
                 plt.imshow(model.fake_B[j].data.cpu().numpy(), 
                                 aspect='auto', origin='lower')
                 plt.title(model.video_name[j]+"_predict")

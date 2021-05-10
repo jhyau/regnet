@@ -253,6 +253,7 @@ class Regnet_G(nn.Module):
         mel_output_postnet = self.postnet(mel_output_decoder)
         mel_output = mel_output_decoder + mel_output_postnet
         self.gt_auxilitary = gt_auxilitary
+        print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')
         return mel_output, mel_output_decoder
 
 
@@ -380,9 +381,11 @@ class Regnet(nn.Module):
         self.real_A = input.to(self.device).float()
         self.real_B = mel.to(self.device).float()
         self.video_name = video_name
+        print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}, video name: {self.video_name}')
 
     def forward(self):
         self.fake_B, self.fake_B_postnet = self.netG(self.real_A, self.real_B)
+        print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
 
     def get_scheduler(self, optimizer, config):
         def lambda_rule(epoch):
