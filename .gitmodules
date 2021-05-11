@@ -1,3 +1,6 @@
 [submodule "temporal-segment-networks"]
 	path = temporal-segment-networks
 	url = git@github.com:yjxiong/temporal-segment-networks.git
+[submodule "waveglow"]
+	path = waveglow
+	url = git@github.com:jhyau/waveglow.git

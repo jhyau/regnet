@@ -32,7 +32,7 @@ if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="data/features/dog/audio_10s_22050hz")
     paser.add_argument("-o", "--output_dir", default="data/features/dog/melspec_10s_22050hz")
-    # Maybe need to change length here to match 15 seconds?
+    # Maybe need to change length here to match 15 seconds (22050 * 15)?
     paser.add_argument("-l", "--length", default=220500)
     paser.add_argument("-n", '--num_worker', type=int, default=32)
     args = paser.parse_args()

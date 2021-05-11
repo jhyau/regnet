@@ -111,11 +111,15 @@ class Encoder(nn.Module):
         z = torch.randn(x.shape[0], self.random_z_dim).to('cuda:0')
         z = z.view(z.size(0), z.size(1), 1).expand(z.size(0), z.size(1), x.size(2))
         x = torch.cat([x, z], 1)
+        print("encoder input earlier size: ", x.size())
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
         x = x.transpose(1, 2)
+        print("before bilstm: ", x.size())
         x, _ = self.BiLSTM(x)
+        print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
+        print("after linear layer: ", x.size())
         return x
 
 
@@ -206,9 +210,11 @@ class Decoder(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, decoder_inputs):
+        print("decode input size: ", decoder_inputs.size())
         x = decoder_inputs.transpose(1, 2)
 
         x = self.model(x)
+        print("decoder output size: ", x.size())
         return x
 
 
@@ -245,12 +251,15 @@ class Regnet_G(nn.Module):
         print(f"Mode input for the generator: {self.mode_input}")
         encoder_output = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
+        print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
         if self.aux_zero:
             gt_auxilitary = gt_auxilitary * 0
-            print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
+            #print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
         encoder_output = torch.cat([encoder_output, gt_auxilitary], dim=2)
+        print("after concatenation to feed to decoder: ", encoder_output.size())
         mel_output_decoder = self.decoder(encoder_output)
         mel_output_postnet = self.postnet(mel_output_decoder)
+        print(f'decoder mel output shape: {mel_output_decoder.size()} and postnet output shape: {mel_output_postnet.size()}')
         mel_output = mel_output_decoder + mel_output_postnet
         self.gt_auxilitary = gt_auxilitary
         print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')

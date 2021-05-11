@@ -278,6 +278,7 @@ class WaveNet(nn.Module):
                 T = max(T, test_inputs.size(1))
         # cast to int in case of numpy.int64...
         T = int(T)
+        print(f'The T (time steps) used to generate sound used: {T}')
 
         # Global conditioning
         if g is not None:
@@ -297,6 +298,7 @@ class WaveNet(nn.Module):
                 c = f(c)
             # B x C x T
             c = c.squeeze(1)
+            print("size of c last dim: ", c.size(-1))
             assert c.size(-1) == T
         if c is not None and c.size(-1) == T:
             c = c.transpose(1, 2).contiguous()
