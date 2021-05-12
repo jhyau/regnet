@@ -161,7 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--vocoder', type=str, default='waveglow', help='Vocoder to use. waveglow or wavenet')
     parser.add_argument('-c', '--config_file', type=str, default='',
                         help='file for configuration')
-    parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/published_ver/waveglow_256channels_universal_v5.pt', help='The path to waveglow checkpoint to load')
+    parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/TrainAll/waveglow_99000', help='The path to waveglow checkpoint to load')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
     parser.add_argument('--sigma', default=1.0, type=float)
     parser.add_argument('--sampling_rate', default=22050, type=int)

@@ -52,6 +52,12 @@ conda install ffmpeg -n regnet -c conda-forge
 pip install -r requirements.txt
 ```
 
+Note: Can use newer torch version and updated CUDA tool kit, so suggest installing:
+```
+conda install pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=11.0 -c pytorch
+```
+instead of pytorch==1.2.0
+
 ### Download Datasets
 
 In our paper, we collect 8 sound types (Dog, Fireworks, Drum, Baby form [VEGAS][vegas] and Gun, Sneeze, Cough, Hammer from [AudioSet][audioset]) to build our [Visually Aligned Sound (VAS)][VAS] dataset.

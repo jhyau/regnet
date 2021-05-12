@@ -63,15 +63,45 @@ def pipline(video_path, output_dir, fps, sr, duration_target):
             P.join(cut_video_dir, video_name), fps, P.join(fps_audio_dir, video_name)))
 
 if __name__ == '__main__':
+    """
+    "data_config": {
+        "training_files": "train_files_tapping_wooden.txt",
+        "validation_files": "test_files_tapping_wooden.txt",
+        "segment_length": 32000,
+        "sampling_rate": 44100,
+        "filter_length": 1024,
+        "hop_length": 256,
+        "win_length": 1024,
+        "mel_fmin": 0.0,
+        "mel_fmax": 16000.0
+    },
+    "dist_config": {
+        "dist_backend": "nccl",
+        "dist_url": "tcp://localhost:54321"
+    },
 
+    "waveglow_config": {
+        "n_mel_channels": 80,
+        "n_flows": 12,
+        "n_group": 8,
+        "n_early_every": 4,
+        "n_early_size": 2,
+        "WN_config": {
+            "n_layers": 8,
+            "n_channels": 256,
+            "kernel_size": 3
+        }
+    }
+    """
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="data/VAS/dog/videos")
     paser.add_argument("-o", "--output_dir", default="data/features/dog")
-    paser.add_argument("-d", "--duration", type=int, default=15)
-    paser.add_argument("-a", '--audio_sample_rate', default='22050')
+    paser.add_argument("-d", "--duration", type=int, default=10)
+    paser.add_argument("-a", '--audio_sample_rate', default='44100') # originally 22050
     paser.add_argument("-v", '--video_fps', default='21.5')
     paser.add_argument("-n", '--num_worker', type=int, default=32)
     args = paser.parse_args()
+    print(f'args for extracting audio and video: {args}')
     input_dir = args.input_dir
     output_dir = args.output_dir
     duration_target = args.duration
