@@ -76,6 +76,10 @@ if __name__ == '__main__':
     output_dir = args.output_dir
     length = int(args.length)
 
+    # Check that the input directory exists
+    if not os.path.isdir(input_dir):
+        raise Exception("Provided input file for extracting mel spectrograms does not exist")
+
     audio_paths = glob(P.join(input_dir, "*.wav"))
     audio_paths.sort()
 

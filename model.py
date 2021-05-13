@@ -147,6 +147,7 @@ class Auxiliary_lstm_sample(nn.Module):
         self.BiLSTM = nn.LSTM(config.n_mel_channels, int(config.auxiliary_dim/2), 2,
                            batch_first=True, bidirectional=True)
         self.auxiliary_sample_rate = config.auxiliary_sample_rate
+        self.mel_samples = config.mel_samples
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -159,7 +160,8 @@ class Auxiliary_lstm_sample(nn.Module):
         backword_sampled = backword[:, torch.arange(0, T, self.auxiliary_sample_rate).long()+1, :]
         sampled = torch.cat([forword_sampled, backword_sampled], dim=-1)
         sampled_repeat = sampled.unsqueeze(1).repeat(1, int(self.auxiliary_sample_rate/4), 1, 1).view(bs, -1, C)
-        assert sampled_repeat.shape[1] == math.ceil(860/self.auxiliary_sample_rate) * int(self.auxiliary_sample_rate/4)
+        #assert sampled_repeat.shape[1] == math.ceil(860/self.auxiliary_sample_rate) * int(self.auxiliary_sample_rate/4)
+        assert sampled_repeat.shape[1] == math.ceil(self.mel_samples/self.auxiliary_sample_rate) * int(self.auxiliary_sample_rate/4)
         sampled_repeat = sampled_repeat[:, :215, :]
         return sampled_repeat
 
@@ -210,11 +212,11 @@ class Decoder(nn.Module):
         self.model = nn.Sequential(*model)
 
     def forward(self, decoder_inputs):
-        print("decode input size: ", decoder_inputs.size())
         x = decoder_inputs.transpose(1, 2)
+        print("decode input size after transpose: ", x.size())
 
         x = self.model(x)
-        print("decoder output size: ", x.size())
+        #print("decoder output size: ", x.size())
         return x
 
 
@@ -251,7 +253,7 @@ class Regnet_G(nn.Module):
         print(f"Mode input for the generator: {self.mode_input}")
         encoder_output = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
-        print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
+        #print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
         if self.aux_zero:
             gt_auxilitary = gt_auxilitary * 0
             #print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
@@ -262,7 +264,7 @@ class Regnet_G(nn.Module):
         print(f'decoder mel output shape: {mel_output_decoder.size()} and postnet output shape: {mel_output_postnet.size()}')
         mel_output = mel_output_decoder + mel_output_postnet
         self.gt_auxilitary = gt_auxilitary
-        print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')
+        #print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')
         return mel_output, mel_output_decoder
 
 

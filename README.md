@@ -103,6 +103,9 @@ CUDA_VISIBLE_DEVICES=7 python train.py \
 checkpoint_path ckpt/dog/checkpoint_018081
 ```
 
+Notes:
+When starting own training, in addition to repalce rgb\_feature\_dir and flow\_feature\_dir adn mel\_dir, also replace training\_files, test\_files, and batch\_size.
+
 ## Generating Sound
 
 

@@ -54,7 +54,7 @@ def build_wavenet(checkpoint_path=None, device='cuda:0'):
 
     return model
 
-def gen_waveform(model, save_path, c, device):
+def gen_waveform(model, save_path, c, device, args):
     initial_input = torch.zeros(1, 1, 1).to(device)
     if c.shape[1] != config.n_mel_channels:
         c = np.swapaxes(c, 0, 1)
@@ -66,7 +66,7 @@ def gen_waveform(model, save_path, c, device):
             initial_input, c=c, g=None, T=length, tqdm=tqdm, softmax=True, quantize=True,
             log_scale_min=np.log(1e-14))
     waveform = y_hat.view(-1).cpu().data.numpy()
-    librosa.output.write_wav(save_path, waveform, sr=22050)
+    librosa.output.write_wav(save_path, waveform, sr=args.sampling_rate) # default sr=22050
 
 def gen_waveform_waveglow(args, save_path, c, device):
     # Set up the waveglow config
@@ -151,7 +151,7 @@ def test_model(args, config):
                 mel_spec = model.fake_B[j].data.cpu().numpy()
                 save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
                 if args.vocoder == 'wavenet':
-                    gen_waveform(wavenet_model, save_path, mel_spec, device)
+                    gen_waveform(wavenet_model, save_path, mel_spec, device, args)
                 else:
                     gen_waveform_waveglow(args, save_path, mel_spec, device)
     model.train()
