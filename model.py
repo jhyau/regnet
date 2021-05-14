@@ -130,13 +130,15 @@ class Auxiliary_lstm_last(nn.Module):
         self.BiLSTM = nn.LSTM(config.n_mel_channels, int(config.auxiliary_dim), 2,
                            batch_first=True, bidirectional=True)
         self.BiLSTM_proj = nn.Linear(config.auxiliary_dim, config.auxiliary_dim)
+        self.video_samples = config.video_samples 
 
     def forward(self, x):
         x = x.transpose(1, 2)
         x, (h, c) = self.BiLSTM(x)
         x = self.BiLSTM_proj(h[-1])
         bs, c = x.shape
-        x = x.unsqueeze(1).expand(bs, 215, c)
+        #x = x.unsqueeze(1).expand(bs, 215, c)
+        x = x.unsqueeze(1).expand(bs, self.video_samples, c)
         return x
 
 
@@ -148,6 +150,7 @@ class Auxiliary_lstm_sample(nn.Module):
                            batch_first=True, bidirectional=True)
         self.auxiliary_sample_rate = config.auxiliary_sample_rate
         self.mel_samples = config.mel_samples
+        self.video_samples = config.video_samples
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -162,7 +165,8 @@ class Auxiliary_lstm_sample(nn.Module):
         sampled_repeat = sampled.unsqueeze(1).repeat(1, int(self.auxiliary_sample_rate/4), 1, 1).view(bs, -1, C)
         #assert sampled_repeat.shape[1] == math.ceil(860/self.auxiliary_sample_rate) * int(self.auxiliary_sample_rate/4)
         assert sampled_repeat.shape[1] == math.ceil(self.mel_samples/self.auxiliary_sample_rate) * int(self.auxiliary_sample_rate/4)
-        sampled_repeat = sampled_repeat[:, :215, :]
+        #sampled_repeat = sampled_repeat[:, :215, :]
+        sampled_repeat = sampled_repeat[:, :self.video_samples, :]
         return sampled_repeat
 
 

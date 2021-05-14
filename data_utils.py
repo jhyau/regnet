@@ -34,6 +34,7 @@ class RegnetLoader(torch.utils.data.Dataset):
 
     def get_mel(self, filename):
         melspec = np.load(filename)
+        print(f"melspec shape: {melspec.shape}, num  of mel samples: {self.mel_samples}")
         if melspec.shape[1] < self.mel_samples:
             melspec_padded = np.zeros((melspec.shape[0], self.mel_samples))
             melspec_padded[:, 0:melspec.shape[1]] = melspec
@@ -46,6 +47,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         with open(im_path, 'rb') as f:
             im = pickle.load(f, encoding='bytes')
         f.close()
+        print(f"img shape: {im.shape}, num of video samples: {self.video_samples}")
         if im.shape[0] < self.video_samples:
             im_padded = np.zeros((self.video_samples, im.shape[1]))
             im_padded[0:im.shape[0], :] = im
