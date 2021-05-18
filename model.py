@@ -205,6 +205,29 @@ class Decoder(nn.Module):
         model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
         model += [nn.ReLU(True)]
 
+        # Adding additional transpose convolution layers to upsample more
+        model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                               kernel_size=5, stride=1, padding=2)]
+        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        model += [nn.ReLU(True)]
+
+        # Adding 1D convolution layer after transpose convolution layer
+        model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                               kernel_size=5, stride=1, padding=2)]
+        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        model += [nn.ReLU(True)]
+
+        model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                               kernel_size=5, stride=1, padding=2)]
+        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        model += [nn.ReLU(True)]
+
+        model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                               kernel_size=5, stride=1, padding=2)]
+        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        model += [nn.ReLU(True)]
+        # Done adding two additional transpose convolution layers
+
         model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=self.n_mel_channels,
                                kernel_size=4, stride=2, padding=1)]
         model += [nn.BatchNorm1d(self.n_mel_channels)]
