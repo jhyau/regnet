@@ -111,15 +111,15 @@ class Encoder(nn.Module):
         z = torch.randn(x.shape[0], self.random_z_dim).to('cuda:0')
         z = z.view(z.size(0), z.size(1), 1).expand(z.size(0), z.size(1), x.size(2))
         x = torch.cat([x, z], 1)
-        print("encoder input earlier size: ", x.size())
+        #print("encoder input earlier size: ", x.size())
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
         x = x.transpose(1, 2)
-        print("before bilstm: ", x.size())
+        #print("before bilstm: ", x.size())
         x, _ = self.BiLSTM(x)
-        print("after bilstm: ", x.size())
+        #print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
-        print("after linear layer: ", x.size())
+        #print("after linear layer: ", x.size())
         return x
 
 
@@ -285,10 +285,10 @@ class Regnet_G(nn.Module):
             gt_auxilitary = gt_auxilitary * 0
             #print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
         encoder_output = torch.cat([encoder_output, gt_auxilitary], dim=2)
-        print("after concatenation to feed to decoder: ", encoder_output.size())
+        #print("after concatenation to feed to decoder: ", encoder_output.size())
         mel_output_decoder = self.decoder(encoder_output)
         mel_output_postnet = self.postnet(mel_output_decoder)
-        print(f'decoder mel output shape: {mel_output_decoder.size()} and postnet output shape: {mel_output_postnet.size()}')
+        #print(f'decoder mel output shape: {mel_output_decoder.size()} and postnet output shape: {mel_output_postnet.size()}')
         mel_output = mel_output_decoder + mel_output_postnet
         self.gt_auxilitary = gt_auxilitary
         #print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')
@@ -304,6 +304,12 @@ class Regnet_D(nn.Module):
                                kernel_size=4, stride=2, padding=1),
             nn.BatchNorm1d(config.decoder_conv_dim),
             nn.LeakyReLU(0.2, True),
+            # Add an additional upsampling layer to match 1720 output
+            nn.ConvTranspose1d(config.decoder_conv_dim, config.decoder_conv_dim,
+                               kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm1d(config.decoder_conv_dim),
+            nn.LeakyReLU(0.2, True),
+            # End of adding additional upsampling layer
             nn.ConvTranspose1d(config.decoder_conv_dim, 64,
                                kernel_size=4, stride=2, padding=1),
         )
@@ -329,10 +335,10 @@ class Regnet_D(nn.Module):
 
     def forward(self, *inputs):
         feature, mel = inputs
-        print(f"discriminator feature shape: {feature.size()}, mel shape: {mel.size()}")
+        #print(f"discriminator feature shape: {feature.size()}, mel shape: {mel.size()}")
         feature_conv = self.feature_conv(feature.transpose(1, 2))
         mel_conv = self.mel_conv(mel)
-        print(f"discriminator after transform feature shape: {feature_conv.size()}, mel shape: {mel_conv.size()}")
+        #print(f"discriminator after transform feature shape: {feature_conv.size()}, mel shape: {mel_conv.size()}")
         input_cat = torch.cat((feature_conv, mel_conv), 1)
         out = self.down_sampling(input_cat)
         out = nn.Sigmoid()(out)
@@ -421,7 +427,7 @@ class Regnet(nn.Module):
         self.real_A = input.to(self.device).float()
         self.real_B = mel.to(self.device).float()
         self.video_name = video_name
-        print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}, video name: {self.video_name}')
+        print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}')
 
     def forward(self):
         self.fake_B, self.fake_B_postnet = self.netG(self.real_A, self.real_B)
