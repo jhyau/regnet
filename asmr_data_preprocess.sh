@@ -7,6 +7,8 @@ duration_num=10
 mel_duration_num=$((44100 * duration_num))
 echo $mel_duration_num
 audio_sample_rate=44100
+echo $duration
+echo $audio_sample_rate
 #for soundtype in $soundlist 
 #do
 

@@ -207,7 +207,7 @@ class Decoder(nn.Module):
 
         # Adding additional transpose convolution layers to upsample more
         model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-                               kernel_size=5, stride=1, padding=2)]
+                               kernel_size=4, stride=2, padding=1)]
         model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
         model += [nn.ReLU(True)]
 
@@ -217,16 +217,16 @@ class Decoder(nn.Module):
         model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
         model += [nn.ReLU(True)]
 
-        model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-                               kernel_size=5, stride=1, padding=2)]
-        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        model += [nn.ReLU(True)]
+        #model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+        #                       kernel_size=4, stride=2, padding=1)]
+        #model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        #model += [nn.ReLU(True)]
 
-        model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-                               kernel_size=5, stride=1, padding=2)]
-        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        model += [nn.ReLU(True)]
-        # Done adding two additional transpose convolution layers
+        #model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+        #                       kernel_size=5, stride=1, padding=2)]
+        #model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+        #model += [nn.ReLU(True)]
+        # Done adding one additional transpose convolution layer. Adding two leads to 16*input size
 
         model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=self.n_mel_channels,
                                kernel_size=4, stride=2, padding=1)]
@@ -329,8 +329,10 @@ class Regnet_D(nn.Module):
 
     def forward(self, *inputs):
         feature, mel = inputs
+        print(f"discriminator feature shape: {feature.size()}, mel shape: {mel.size()}")
         feature_conv = self.feature_conv(feature.transpose(1, 2))
         mel_conv = self.mel_conv(mel)
+        print(f"discriminator after transform feature shape: {feature_conv.size()}, mel shape: {mel_conv.size()}")
         input_cat = torch.cat((feature_conv, mel_conv), 1)
         out = self.down_sampling(input_cat)
         out = nn.Sigmoid()(out)
