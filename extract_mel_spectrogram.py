@@ -22,7 +22,7 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples):
     mel_spec = np.clip((mel_spec + 100) / 100, 0, 1.0)
     
     #mel_spec = mel_spec[:, :860]
-    assert(mel_samples == 1720)
+    #assert(mel_samples == 1720)
     mel_spec = mel_spec[:, :mel_samples]
     os.makedirs(save_dir, exist_ok=True)
     audio_name = os.path.basename(audio_path).split('.')[0]

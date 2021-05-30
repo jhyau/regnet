@@ -32,7 +32,7 @@ def build_wavenet(checkpoint_path=None, device='cuda:0'):
         residual_channels=512,
         gate_channels=512,
         skip_out_channels=256,
-        cin_channels=80,
+        cin_channels=80, # If n_mel_samples is not 80 anymore, need to change this part to match
         gin_channels=-1,
         weight_normalization=True,
         n_speakers=None,
@@ -120,6 +120,17 @@ def test_model(args, config):
     wavenet_model = build_wavenet(config.wavenet_path, device) 
     with torch.no_grad():
         for i, batch in enumerate(test_loader):
+            #if args.gt:
+            #    input, mel, video_name = batch
+            #    for j in range(len(mel)):
+                    # Use the vocoder to produce sound of the grount truth audio
+            #        mel_spec = mel[j].data
+            #        save_path = os.path.join(config.save_dir, video_name[j]+"_gt.wav")
+            #        if args.vocoder == 'wavenet':
+            #            gen_waveform(wavenet_model, save_path, mel_spec, device, args)
+            #        else:
+            #            gen_waveform_waveglow(args, save_path, mel_spec, device)
+            #    continue 
             model.parse_batch(batch)
             model.forward()            
             for j in range(len(model.fake_B)):
@@ -127,12 +138,16 @@ def test_model(args, config):
                 plt.subplot(311)
                 # model.real_B is the ground truth spectrogram
                 print(f"ground truth spec size: {model.real_B[j].data.cpu().numpy().shape}")
+                print("ground truth values: ", model.real_B[j].data.cpu().numpy())
+                print(f"ground truth max: {np.max(model.real_B[j].data.cpu().numpy())} and min: {np.min(model.real_B[j].data.cpu().numpy())}")
                 plt.imshow(model.real_B[j].data.cpu().numpy(), 
                                 aspect='auto', origin='lower')
                 plt.title(model.video_name[j]+"_ground_truth")
                 plt.subplot(312)
                 # model.fake_B is the generator's prediction
                 print(f"prediction spec size: {model.fake_B[j].data.cpu().numpy().shape}")
+                print("prediction values: ", model.fake_B[j].data.cpu().numpy())
+                print(f'prediction max: {np.max(model.fake_B[j].data.cpu().numpy())} and min: {np.min(model.fake_B[j].data.cpu().numpy())}')
                 plt.imshow(model.fake_B[j].data.cpu().numpy(), 
                                 aspect='auto', origin='lower')
                 plt.title(model.video_name[j]+"_predict")
@@ -148,8 +163,12 @@ def test_model(args, config):
                 np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
                           model.fake_B[j].data.cpu().numpy())
                 # Using the prediction mel spectrogram to generate sound
-                mel_spec = model.fake_B[j].data.cpu().numpy()
-                save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
+                if args.gt:
+                    mel_spec = model.real_B[j].data.cpu().numpy()
+                    save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
+                else:
+                    mel_spec = model.fake_B[j].data.cpu().numpy()
+                    save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
                 if args.vocoder == 'wavenet':
                     gen_waveform(wavenet_model, save_path, mel_spec, device, args)
                 else:
@@ -166,6 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--sigma', default=1.0, type=float)
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
+    parser.add_argument('--gt', action='store_true')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
