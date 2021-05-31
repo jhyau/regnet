@@ -74,11 +74,12 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
     model.train()
 
 
-def train():
+def train(args):
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed(config.seed)
 
-    model = Regnet()
+    # Include the extra_upsampling parameter
+    model = Regnet(extra_upsampling=args.extra_upsampling)
 
     criterion = RegnetLoss(config.loss_type)
 
@@ -133,6 +134,7 @@ def train():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--extra_upsampling', action='store_true', help='include flag to add extra upsampling layers in the decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument('-c', '--config_file', type=str, default='',
                         help='file for configuration')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
@@ -159,4 +161,4 @@ if __name__ == '__main__':
     print("cuDNN Benchmark:", config.cudnn_benchmark)
     
     print("Config being used: \n", config)
-    train()
+    train(args)

@@ -107,7 +107,8 @@ def gen_waveform_waveglow(args, save_path, c, device):
 def test_model(args, config):
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed(config.seed)
-    model = Regnet()
+    # add extra_upsampling parameter
+    model = Regnet(extra_upsampling=args.extra_upsampling)
     valset = RegnetLoader(config.test_files)
     test_loader = DataLoader(valset, num_workers=4, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
@@ -186,6 +187,7 @@ if __name__ == '__main__':
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--gt', action='store_true')
+    parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()
 

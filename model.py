@@ -191,9 +191,11 @@ class Auxiliary_conv(nn.Module):
 
 
 class Decoder(nn.Module):
-    def __init__(self):
+    def __init__(self, extra_upsampling):
         super(Decoder, self).__init__()
         self.n_mel_channels = config.n_mel_channels
+        # Added extra_upsampling parameter
+        self.extra_upsampling = extra_upsampling
         model = []
         model += [nn.ConvTranspose1d(in_channels=config.decoder_conv_dim + config.auxiliary_dim, out_channels=int(config.decoder_conv_dim / 2),
                                kernel_size=4, stride=2, padding=1)]
@@ -205,28 +207,19 @@ class Decoder(nn.Module):
         model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
         model += [nn.ReLU(True)]
 
-        # Adding additional transpose convolution layers to upsample more
-        model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-                               kernel_size=4, stride=2, padding=1)]
-        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        model += [nn.ReLU(True)]
+        if extra_upsampling:
+            # Adding additional transpose convolution layers to upsample more
+            model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                                   kernel_size=4, stride=2, padding=1)]
+            model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+            model += [nn.ReLU(True)]
 
-        # Adding 1D convolution layer after transpose convolution layer
-        model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-                               kernel_size=5, stride=1, padding=2)]
-        model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        model += [nn.ReLU(True)]
-
-        #model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-        #                       kernel_size=4, stride=2, padding=1)]
-        #model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        #model += [nn.ReLU(True)]
-
-        #model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
-        #                       kernel_size=5, stride=1, padding=2)]
-        #model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
-        #model += [nn.ReLU(True)]
-        # Done adding one additional transpose convolution layer. Adding two leads to 16*input size
+            # Adding 1D convolution layer after transpose convolution layer
+            model += [nn.Conv1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=int(config.decoder_conv_dim / 2),
+                                   kernel_size=5, stride=1, padding=2)]
+            model += [nn.BatchNorm1d(int(config.decoder_conv_dim / 2))]
+            model += [nn.ReLU(True)]
+            # Done adding one additional transpose convolution layer. Adding two leads to 16*input size
 
         model += [nn.ConvTranspose1d(in_channels=int(config.decoder_conv_dim / 2), out_channels=self.n_mel_channels,
                                kernel_size=4, stride=2, padding=1)]
@@ -248,7 +241,7 @@ class Decoder(nn.Module):
 
 
 class Regnet_G(nn.Module):
-    def __init__(self):
+    def __init__(self, extra_upsampling):
         super(Regnet_G, self).__init__()
         auxiliary_class = None
         if config.auxiliary_type == "lstm_last":
@@ -258,9 +251,11 @@ class Regnet_G(nn.Module):
         elif config.auxiliary_type == "conv":
             auxiliary_class = Auxiliary_conv
         self.n_mel_channels = config.n_mel_channels
+        # Added extra_upsampling boolean
+        self.extra_upsampling = extra_upsampling
         self.encoder = Encoder()
         self.auxiliary = auxiliary_class()
-        self.decoder = Decoder()
+        self.decoder = Decoder(extra_upsampling)
         self.postnet = Postnet()
         if config.mode_input == "":
             self.mode_input = "vis_spec" if self.training else "vis"
@@ -296,23 +291,39 @@ class Regnet_G(nn.Module):
 
 
 class Regnet_D(nn.Module):
-    def __init__(self):
+    def __init__(self, extra_upsampling):
         super(Regnet_D, self).__init__()
 
-        self.feature_conv = nn.Sequential(
-            nn.ConvTranspose1d(config.visual_dim, config.decoder_conv_dim,
-                               kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm1d(config.decoder_conv_dim),
-            nn.LeakyReLU(0.2, True),
-            # Add an additional upsampling layer to match 1720 output
-            nn.ConvTranspose1d(config.decoder_conv_dim, config.decoder_conv_dim,
-                               kernel_size=4, stride=2, padding=1),
-            nn.BatchNorm1d(config.decoder_conv_dim),
-            nn.LeakyReLU(0.2, True),
-            # End of adding additional upsampling layer
-            nn.ConvTranspose1d(config.decoder_conv_dim, 64,
-                               kernel_size=4, stride=2, padding=1),
-        )
+        if extra_upsampling:
+            self.feature_conv = nn.Sequential(
+                nn.ConvTranspose1d(config.visual_dim, config.decoder_conv_dim,
+                                   kernel_size=4, stride=2, padding=1),
+                nn.BatchNorm1d(config.decoder_conv_dim),
+                nn.LeakyReLU(0.2, True),
+                # Add an additional upsampling layer to match 1720 output
+                nn.ConvTranspose1d(config.decoder_conv_dim, config.decoder_conv_dim,
+                                   kernel_size=4, stride=2, padding=1),
+                nn.BatchNorm1d(config.decoder_conv_dim),
+                nn.LeakyReLU(0.2, True),
+                # End of adding additional upsampling layer
+                nn.ConvTranspose1d(config.decoder_conv_dim, 64,
+                                   kernel_size=4, stride=2, padding=1),
+            )
+        else:
+            self.feature_conv = nn.Sequential(
+                nn.ConvTranspose1d(config.visual_dim, config.decoder_conv_dim,
+                                   kernel_size=4, stride=2, padding=1),
+                nn.BatchNorm1d(config.decoder_conv_dim),
+                nn.LeakyReLU(0.2, True),
+                # Add an additional upsampling layer to match 1720 output
+                #nn.ConvTranspose1d(config.decoder_conv_dim, config.decoder_conv_dim,
+                #                   kernel_size=4, stride=2, padding=1),
+                #nn.BatchNorm1d(config.decoder_conv_dim),
+                #nn.LeakyReLU(0.2, True),
+                # End of adding additional upsampling layer
+                nn.ConvTranspose1d(config.decoder_conv_dim, 64,
+                                   kernel_size=4, stride=2, padding=1),
+            )
 
         self.mel_conv = nn.ConvTranspose1d(config.n_mel_channels, 64,
                                kernel_size=1, stride=1)
@@ -400,14 +411,14 @@ def init_weights(net, init_type='normal', gain=0.02):
 
 
 class Regnet(nn.Module):
-    def __init__(self):
+    def __init__(self, extra_upsampling=False):
         super(Regnet, self).__init__()
         self.config = config
         self.n_mel_channels = config.n_mel_channels
         self.model_names = ['G', 'D']
         self.device = torch.device('cuda:0')
-        self.netG = init_net(Regnet_G(), self.device)
-        self.netD = init_net(Regnet_D(), self.device)
+        self.netG = init_net(Regnet_G(extra_upsampling), self.device)
+        self.netD = init_net(Regnet_D(extra_upsampling), self.device)
         self.criterionGAN = GANLoss().to(self.device)
         self.criterionL1 = RegnetLoss(config.loss_type).to(self.device)
 
@@ -421,6 +432,8 @@ class Regnet(nn.Module):
         self.D_interval = config.D_interval
         self.n_iter = -1
         self.wo_G_GAN = config.wo_G_GAN
+        # add a parameter to indicate when to use extra upsampling layers in the docoder and discriminator (for 44100 audio sample rate)
+        self.extra_upsampling = extra_upsampling
 
     def parse_batch(self, batch):
         input, mel, video_name = batch
