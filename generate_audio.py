@@ -81,18 +81,27 @@ def gen_waveform_waveglow(args, save_path, c, device):
     waveglow = torch.load(args.waveglow_path)['model']
     waveglow = waveglow.remove_weightnorm(waveglow)
     waveglow.cuda().eval()
-    # install apex if want to use amp
-    # if is_fp16:
-    #     from apex import amp
-    #     waveglow, _ = amp.initialize(waveglow, [], opt_level="03")
-    if args.denoiser_strength > 0:
-        denoiser = Denoiser(waveglow).cuda()
 
     if c.shape[1] != config.n_mel_channels:
         c = np.swapaxes(c, 0, 1)
     length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
     print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
     c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+
+    # install apex if want to use amp
+    if args.is_fp16:
+        print('using apex for waveglow')
+        from apex import amp
+        waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
+        c = c.half()
+    if args.denoiser_strength > 0:
+        denoiser = Denoiser(waveglow).cuda()
+
+    #if c.shape[1] != config.n_mel_channels:
+    #    c = np.swapaxes(c, 0, 1)
+    #length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
+    #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
+    #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
     with torch.no_grad():
         audio = waveglow.infer(c, sigma=args.sigma)
         if args.denoiser_strength  > 0:
@@ -129,13 +138,14 @@ def generate_audio(args, config):
     test_loader = []
     for id in video_ids:
         mel = get_mel(os.path.join(config.mel_dir, id+"_mel.npy"))
-        test_loader.append(mel)
+        test_loader.append((id, mel))
 
     # Set up device and wavenet
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     wavenet_model = build_wavenet(config.wavenet_path, device)
-    for i,mel_spec in enumerate(test_loader):
-        save_path = os.path.join(config.save_dir, mel_spec+"_gen_audio.wav")
+    for i,(id, mel_spec) in enumerate(test_loader):
+        save_path = os.path.join(config.save_dir, id+"_gen_audio.wav")
+        print("Saving file: ", save_path)
         if args.vocoder == 'wavenet':
             gen_waveform(wavenet_model, save_path, mel_spec, device, args)
         else:
@@ -148,9 +158,10 @@ if __name__ == '__main__':
                         help='file for configuration')
     parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/TrainAll/waveglow_99000', help='The path to waveglow checkpoint to load')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
-    parser.add_argument('--sigma', default=1.0, type=float)
+    parser.add_argument('--sigma', default=6.0, type=float)
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
+    parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
     parser.add_argument('--gt', action='store_true')
     parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
