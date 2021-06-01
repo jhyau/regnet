@@ -91,3 +91,5 @@ if __name__ == '__main__':
 
     with Pool(args.num_worker) as p:
         p.map(partial(get_spectrogram, save_dir=output_dir, length=length, mel_basis=mel_basis, mel_samples=args.mel_samples), audio_paths)
+
+    print("extracting mel spectrograms worker pool has closed")

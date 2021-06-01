@@ -165,6 +165,7 @@ def test_model(args, config):
                           model.fake_B[j].data.cpu().numpy())
                 # Using the prediction mel spectrogram to generate sound
                 if args.gt:
+                    print("using ground truth melspectrograms for vocoder inference...")
                     mel_spec = model.real_B[j].data.cpu().numpy()
                     save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
                 else:
