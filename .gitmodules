@@ -4,3 +4,6 @@
 [submodule "waveglow"]
 	path = waveglow
 	url = git@github.com:jhyau/waveglow.git
+[submodule "video-splitter"]
+	path = video-splitter
+	url = git@github.com:jhyau/video-splitter.git
