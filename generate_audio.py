@@ -85,23 +85,24 @@ def gen_waveform_waveglow(args, save_path, c, device):
     if c.shape[1] != config.n_mel_channels:
         c = np.swapaxes(c, 0, 1)
     length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
+    #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
+    #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
     print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
-    c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
 
     # install apex if want to use amp
     if args.is_fp16:
         print('using apex for waveglow')
         from apex import amp
         waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
-        c = c.half()
+        #c = c.half()
+
     if args.denoiser_strength > 0:
         denoiser = Denoiser(waveglow).cuda()
 
-    #if c.shape[1] != config.n_mel_channels:
-    #    c = np.swapaxes(c, 0, 1)
-    #length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
-    #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
-    #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+    mel = torch.autograd.Variable(c)
+    mel = torch.unsqueeze(mel, 0)
+    mel = mel.half() if args.is_fp16 else mel
+
     with torch.no_grad():
         audio = waveglow.infer(c, sigma=args.sigma)
         if args.denoiser_strength  > 0:
@@ -152,17 +153,17 @@ def generate_audio(args, config):
             gen_waveform_waveglow(args, save_path, mel_spec, device)
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Generates the audio listed in the test files of the config')
     parser.add_argument('--vocoder', type=str, default='waveglow', help='Vocoder to use. waveglow or wavenet')
     parser.add_argument('-c', '--config_file', type=str, default='',
                         help='file for configuration')
-    parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/TrainAll/waveglow_99000', help='The path to waveglow checkpoint to load')
+    parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/published_ver/waveglow_256channels_universal_v5.pt', help='The path to waveglow checkpoint to load')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
     parser.add_argument('--sigma', default=6.0, type=float)
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
-    parser.add_argument('--gt', action='store_true')
+    parser.add_argument('--gt', action='store_true', help='Use this flag to only generate sound for the ground truth')
     parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()

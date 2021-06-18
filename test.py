@@ -88,25 +88,25 @@ def gen_waveform_waveglow(args, save_path, c, device):
         c = np.swapaxes(c, 0, 1)
     length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
     print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
-    c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+    #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
 
     # install apex if want to use amp
     if args.is_fp16:
         print("using apex for waveglow sound generation...")
         from apex import amp
         waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
-        c = c.half()
+        #c = c.half()
 
     if args.denoiser_strength > 0:
         denoiser = Denoiser(waveglow).cuda()
 
-    #if c.shape[1] != config.n_mel_channels:
-    #    c = np.swapaxes(c, 0, 1)
-    #length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
-    #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
+    mel = torch.autograd.Variable(c)
+    mel = torch.unsqueeze(mel, 0)
     #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+    mel = mel.half() if args.is_fp16 else mel
+
     with torch.no_grad():
-        audio = waveglow.infer(c, sigma=args.sigma)
+        audio = waveglow.infer(mel, sigma=args.sigma)
         if args.denoiser_strength  > 0:
             audio = denoiser(audio, args.denoiser_strength)
         #audio = audio * MAX_WAV_VALUE

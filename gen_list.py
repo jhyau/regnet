@@ -21,10 +21,14 @@ if __name__ == '__main__':
     
     if args.prefix in ["dog", "fireworks", "baby", "drum"]:
         n_test = 128
-    elif args.prefix in ["ASMR_1_Hr", 'ASMR_3_Hrs_fake_audio']:
+    elif args.prefix in ['ASMR_3_Hrs_fake_audio']:
         n_test = 2
+    elif args.prefix in ["ASMR_1_Hr"]:
+        n_test = 64
     elif args.prefix in ["ASMR_3_Hrs"]:
         n_test = 4
+    elif args.prefix in ["ASMR"]:
+        n_test = 100
     else:
         n_test = 64
 
