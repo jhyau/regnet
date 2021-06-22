@@ -7,6 +7,10 @@ from multiprocessing import Pool
 from functools import partial
 from glob import glob
 
+from waveglow.mel2samp import files_to_list, load_wav_to_torch, MAX_WAV_VALUE
+import torch
+import torch.utils.data
+from scipy.io.wavfile import read
 #mel_basis = librosa.filters.mel(22050, n_fft=1024, fmin=125, fmax=7600, n_mels=80)
 
 def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples):
@@ -28,6 +32,19 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples):
     audio_name = os.path.basename(audio_path).split('.')[0]
     np.save(P.join(save_dir, audio_name + "_mel.npy"), mel_spec)
     np.save(P.join(save_dir, audio_name + "_audio.npy"), y)
+
+
+def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples):
+    """
+    Convert audio to mel spectrograms following waveglow's mel2samp functions
+    """
+    audio, sr = load_wav_to_torch(audio_path)
+    audio = audio[:, 0]
+
+    # Get the mel spectrogram
+    audio_norm = audio / MAX_WAV_VALUE
+    audio_norm = audio_norm.unsqueeze(0)
+    audio_norm = torch.autograd.Variable(audio_norm, requires_grad=False)
 
 
 if __name__ == '__main__':

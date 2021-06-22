@@ -20,7 +20,7 @@ sys.path.append('./waveglow/')
 sys.path.append('./waveglow/tacotron2/')
 from scipy.io.wavfile import write
 from waveglow.denoiser import Denoiser
-from waveglow.mel2samp import files_to_list, MAX_WAV_VALUE
+from waveglow.mel2samp import files_to_list, load_wav_to_torch, MAX_WAV_VALUE
 from waveglow.train import load_checkpoint
 from waveglow.glow import WaveGlow, WaveGlowLoss
 
@@ -61,6 +61,7 @@ def gen_waveform(model, save_path, c, device, args):
     length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
     print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
     c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+    print(f"actual shape for input melspectrogram: {c.shape}")
     with torch.no_grad():
         y_hat = model.incremental_forward(
             initial_input, c=c, g=None, T=length, tqdm=tqdm, softmax=True, quantize=True,
@@ -82,12 +83,13 @@ def gen_waveform_waveglow(args, save_path, c, device):
     waveglow = waveglow.remove_weightnorm(waveglow)
     waveglow.cuda().eval()
 
-    if c.shape[1] != config.n_mel_channels:
-        c = np.swapaxes(c, 0, 1)
-    length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
+    print(f"loaded mel spectrogram original shape: {c.shape}")
+    #if c.shape[1] != config.n_mel_channels:
+    #    c = np.swapaxes(c, 0, 1)
+    #length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
     #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
     #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
-    print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
+    #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
 
     # install apex if want to use amp
     if args.is_fp16:
@@ -97,14 +99,16 @@ def gen_waveform_waveglow(args, save_path, c, device):
         #c = c.half()
 
     if args.denoiser_strength > 0:
-        denoiser = Denoiser(waveglow).cuda()
+        #denoiser = Denoiser(waveglow).cuda()
+        denoiser = Denoiser(waveglow).to(device)
 
-    mel = torch.autograd.Variable(c)
+    mel = torch.autograd.Variable(c.to(device))
     mel = torch.unsqueeze(mel, 0)
     mel = mel.half() if args.is_fp16 else mel
+    print(f"waveglow actual input melspectrogram shape: {mel.shape}")
 
     with torch.no_grad():
-        audio = waveglow.infer(c, sigma=args.sigma)
+        audio = waveglow.infer(mel, sigma=args.sigma)
         if args.denoiser_strength  > 0:
             audio = denoiser(audio, args.denoiser_strength)
         #audio = audio * MAX_WAV_VALUE
@@ -146,6 +150,9 @@ def generate_audio(args, config):
     wavenet_model = build_wavenet(config.wavenet_path, device)
     for i,(id, mel_spec) in enumerate(test_loader):
         save_path = os.path.join(config.save_dir, id+"_gen_audio.wav")
+        # Check the save dir exists
+        if not os.path.exists(config.save_dir):
+            os.mkdir(config.save_dir)
         print("Saving file: ", save_path)
         if args.vocoder == 'wavenet':
             gen_waveform(wavenet_model, save_path, mel_spec, device, args)

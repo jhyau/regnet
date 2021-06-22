@@ -26,7 +26,7 @@ if __name__ == '__main__':
     elif args.prefix in ["ASMR_1_Hr"]:
         n_test = 64
     elif args.prefix in ["ASMR_3_Hrs"]:
-        n_test = 4
+        n_test = 128
     elif args.prefix in ["ASMR"]:
         n_test = 100
     else:

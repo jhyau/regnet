@@ -55,6 +55,8 @@ if __name__ == '__main__':
     width = args.width
     height = args.height
 
+    print("args for extracting rgb and optical flow features: ", args)
+
     video_paths = glob(P.join(input_dir, "*.mp4"))
     video_paths.sort()
     with Pool(args.num_worker) as p:
