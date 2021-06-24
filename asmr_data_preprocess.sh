@@ -33,10 +33,10 @@ echo $audio_sample_rate
 #-o filelists --prefix ${soundtype}
 
 #Extract Mel-spectrogram from audio
-#python extract_mel_spectrogram.py \
-#-i data/features/ASMR/${dir_name}/audio_${duration}s_${audio_sample_rate}hz \
-#-o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz \
-#-l $mel_duration_num
+python extract_mel_spectrogram.py \
+-i data/features/ASMR/${dir_name}/audio_${duration}s_${audio_sample_rate}hz \
+-o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz \
+-l $mel_duration_num
 
 #Extract RGB feature
 #CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
@@ -58,10 +58,10 @@ echo $audio_sample_rate
 #-i data/features/ASMR/${dir_name}/OF_${duration}s_21.5fps \
 #-o data/features/ASMR/${dir_name}/feature_flow_bninception_dim1024_21.5fps
 
-CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
--t filelists/${soundtype}_test.txt \
--m Flow \
--i data/features/ASMR/${dir_name}/OF_${duration}s_21.5fps \
--o data/features/ASMR/${dir_name}/feature_flow_bninception_dim1024_21.5fps
+#CUDA_VISIBLE_DEVICES=0 python extract_feature.py \
+#-t filelists/${soundtype}_test.txt \
+#-m Flow \
+#-i data/features/ASMR/${dir_name}/OF_${duration}s_21.5fps \
+#-o data/features/ASMR/${dir_name}/feature_flow_bninception_dim1024_21.5fps
 
 #done
