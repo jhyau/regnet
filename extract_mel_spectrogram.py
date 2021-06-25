@@ -47,14 +47,15 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
     print("Getting mel spectrograms for waveglow...")
     audio, sr = load_wav_to_torch(audio_path)
     print(f'shape of audio from scipy.load: {audio.shape}')
+
+    if len(audio.size()) >= 2:
+        audio = audio[:, 0] # (n_samples, n_channels)
+
     y = np.zeros(length)
     if audio.shape[0] < length:
         y[:len(audio)] = audio
     else:
         y = audio[:length]
-    
-    if len(audio.size()) >= 2:
-        audio = audio[:, 0] # (n_samples, n_channels)
 
     # Get the mel spectrogram
     audio_norm = audio / MAX_WAV_VALUE

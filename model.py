@@ -233,7 +233,7 @@ class Decoder(nn.Module):
 
     def forward(self, decoder_inputs):
         x = decoder_inputs.transpose(1, 2)
-        print("decode input size after transpose: ", x.size())
+        #print("decode input size after transpose: ", x.size())
 
         x = self.model(x)
         #print("decoder output size: ", x.size())
@@ -272,7 +272,7 @@ class Regnet_G(nn.Module):
             vis_thr, spec_thr = 0, 1
         else:
             print(self.mode_input)
-        print(f"Mode input for the generator: {self.mode_input}")
+        #print(f"Mode input for the generator: {self.mode_input}")
         encoder_output = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
         #print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
@@ -440,11 +440,11 @@ class Regnet(nn.Module):
         self.real_A = input.to(self.device).float()
         self.real_B = mel.to(self.device).float()
         self.video_name = video_name
-        print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}')
+        #print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}')
 
     def forward(self):
         self.fake_B, self.fake_B_postnet = self.netG(self.real_A, self.real_B)
-        print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
+        #print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
 
     def get_scheduler(self, optimizer, config):
         def lambda_rule(epoch):
