@@ -1,12 +1,19 @@
 
 #soundlist=" "dog" "fireworks" "drum" "baby" "gun" "sneeze" "cough" "hammer" "
 soundtype="ASMR_3_Hrs"
-dir_name="Ultimate_Tapping_ASMR_3_Hours"
+dir_name="asmr_both_vids"
 duration="10"
 duration_num=10
 mel_duration_num=$((44100 * duration_num))
 echo $mel_duration_num
 audio_sample_rate=44100
+filter_length=1024
+hop_length=256
+win_length=1024
+fmin=0.0
+fmax=16000.0
+vocoder="waveglow"
+num_mel_samples=1720
 echo $duration
 echo $audio_sample_rate
 #for soundtype in $soundlist 
@@ -35,8 +42,17 @@ echo $audio_sample_rate
 #Extract Mel-spectrogram from audio
 python extract_mel_spectrogram.py \
 -i data/features/ASMR/${dir_name}/audio_${duration}s_${audio_sample_rate}hz \
--o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz \
--l $mel_duration_num
+-o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz_test \
+-l $mel_duration_num \
+--vocoder ${vocoder} \
+--sampling_rate $audio_sample_rate \
+--fmin $fmin \
+--fmax $fmax \
+--filter_length $filter_length \
+--hop_length $hop_length \
+--win_length $win_length \
+--mel_samples $num_mel_samples
+
 
 #Extract RGB feature
 #CUDA_VISIBLE_DEVICES=0 python extract_feature.py \

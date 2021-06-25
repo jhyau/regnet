@@ -1,11 +1,14 @@
 import numpy as np
-import os
+import os, sys
 import librosa
 import argparse
 import os.path as P
 from multiprocessing import Pool
 from functools import partial
 from glob import glob
+sys.path.append('./waveglow')
+sys.path.append('./waveglow/tacotron2')
+print(sys.path)
 
 from waveglow.mel2samp import files_to_list, load_wav_to_torch, TacotronSTFT, MAX_WAV_VALUE
 import torch
@@ -29,6 +32,7 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples, args):
     #mel_spec = mel_spec[:, :860]
     #assert(mel_samples == 1720)
     mel_spec = mel_spec[:, :mel_samples]
+    print(f'wavenet melspectrogram shape: {mel_spec.shape}')
     os.makedirs(save_dir, exist_ok=True)
     audio_name = os.path.basename(audio_path).split('.')[0]
     np.save(P.join(save_dir, audio_name + "_mel.npy"), mel_spec)
@@ -47,7 +51,14 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
         y[:len(audio)] = audio
     else:
         y = audio[:length]
-    audio = audio[:, 0] # (n_samples, n_channels)
+    
+    if len(audio.size()) >= 2:
+        audio = audio[:, 0] # (n_samples, n_channels)
+
+    # Limit number of mel samples
+    print(f'shape of audio after extract from one channel: {audio.shape}')
+    audio = audio[:mel_samples]
+    print(f'shape of audio after limit mel samples: {audio.shape}')
 
     # Get the mel spectrogram
     audio_norm = audio / MAX_WAV_VALUE
@@ -133,7 +144,7 @@ if __name__ == '__main__':
 
     with Pool(args.num_worker) as p:
         if args.vocoder == 'waveglow':
-            p.map(partial(get_spectrogram_waveglow, save_dir=output_dir, length=length, mel_basis=mel_basis, mel_samples=args.mel_samples, args=args), audio_paths)
+            p.map(partial(get_spectrogram_waveglow, save_dir=output_dir, length=length, mel_samples=args.mel_samples, args=args), audio_paths)
         else:
             p.map(partial(get_spectrogram, save_dir=output_dir, length=length, mel_basis=mel_basis, mel_samples=args.mel_samples, args=args), audio_paths)
 
