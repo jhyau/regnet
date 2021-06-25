@@ -42,7 +42,7 @@ echo $audio_sample_rate
 #Extract Mel-spectrogram from audio
 python extract_mel_spectrogram.py \
 -i data/features/ASMR/${dir_name}/audio_${duration}s_${audio_sample_rate}hz \
--o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz_test \
+-o data/features/ASMR/${dir_name}/melspec_${duration}s_${audio_sample_rate}hz_test_waveglow_mels \
 -l $mel_duration_num \
 --vocoder ${vocoder} \
 --sampling_rate $audio_sample_rate \

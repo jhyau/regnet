@@ -28,7 +28,8 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples, args):
     mel_spec = np.dot(mel_basis, spectrogram)    
     mel_spec = 20 * np.log10(np.maximum(1e-5, mel_spec)) - 20
     mel_spec = np.clip((mel_spec + 100) / 100, 0, 1.0)
-    
+    print(f'mel_spec space: {mel_spec.shape}')
+
     #mel_spec = mel_spec[:, :860]
     #assert(mel_samples == 1720)
     mel_spec = mel_spec[:, :mel_samples]
@@ -55,11 +56,6 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
     if len(audio.size()) >= 2:
         audio = audio[:, 0] # (n_samples, n_channels)
 
-    # Limit number of mel samples
-    print(f'shape of audio after extract from one channel: {audio.shape}')
-    audio = audio[:mel_samples]
-    print(f'shape of audio after limit mel samples: {audio.shape}')
-
     # Get the mel spectrogram
     audio_norm = audio / MAX_WAV_VALUE
     audio_norm = audio_norm.unsqueeze(0)
@@ -69,8 +65,10 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
     stft = TacotronSTFT(filter_length=args.filter_length, hop_length=args.hop_length, win_length=args.win_length, sampling_rate=args.sampling_rate, mel_fmin=args.fmin, mel_fmax=args.fmax)
     melspec = stft.mel_spectrogram(audio_norm)
     melspec = torch.squeeze(melspec, 0)
+    print(f'Output melspec shape original: {melspec.size()}')
+    melspec = melspec[:, :mel_samples]
     melspec = melspec.detach().cpu().numpy() # Convert torch tensor to numpy
-    print(f'shape of melspec: {melspec.shape}')
+    print(f'shape of melspec final: {melspec.shape}')
 
     # Separate waveglow mel specs for now
     save_dir = save_dir + '_waveglow_mels'
