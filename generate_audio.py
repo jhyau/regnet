@@ -19,10 +19,8 @@ import json
 sys.path.append('./waveglow/')
 sys.path.append('./waveglow/tacotron2/')
 from scipy.io.wavfile import write
-from waveglow.denoiser import Denoiser
-from waveglow.mel2samp import files_to_list, load_wav_to_torch, MAX_WAV_VALUE
-from waveglow.train import load_checkpoint
-from waveglow.glow import WaveGlow, WaveGlowLoss
+from denoiser import Denoiser
+from mel2samp import files_to_list, load_wav_to_torch, MAX_WAV_VALUE
 
 def build_wavenet(checkpoint_path=None, device='cuda:0'):
     model = builder.wavenet(
@@ -69,21 +67,15 @@ def gen_waveform(model, save_path, c, device, args):
     waveform = y_hat.view(-1).cpu().data.numpy()
     librosa.output.write_wav(save_path, waveform, sr=args.sampling_rate) # default sr=22050
 
-def gen_waveform_waveglow(args, save_path, c, device):
+def gen_waveform_waveglow(waveglow, args, save_path, mel, device, denoiser=None):
     # Set up the waveglow config
     #with open(args.waveglow_config, 'rb') as f:
     #    config = json.load(f)
     #waveglow_config = config["waveglow_config"]
-    #train_config = config["train_config"]
-    # Load model from checkpoint, then eval
-    #model = WaveGlow(**waveglow_config).cuda()
-    #optimizer = torch.optim.Adam(model.parameters(), lr=train_config['learning_rate'])
-    #waveglow, optimizer, iteration = load_checkpoint(args.waveglow_path, model, optimizer)
-    waveglow = torch.load(args.waveglow_path)['model']
-    waveglow = waveglow.remove_weightnorm(waveglow)
-    waveglow.cuda().eval()
+    #waveglow = torch.load(args.waveglow_path)['model']
+    #waveglow = waveglow.remove_weightnorm(waveglow)
+    #waveglow.cuda().eval()
 
-    print(f"loaded mel spectrogram original shape: {c.shape}")
     #if c.shape[1] != config.n_mel_channels:
     #    c = np.swapaxes(c, 0, 1)
     #length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
@@ -91,27 +83,25 @@ def gen_waveform_waveglow(args, save_path, c, device):
     #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
     #print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
 
-    # install apex if want to use amp
-    if args.is_fp16:
-        print('using apex for waveglow')
-        from apex import amp
-        waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
-        #c = c.half()
+    #if args.is_fp16:
+    #    print('using apex for waveglow')
+    #    from apex import amp
+    #    waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
 
-    if args.denoiser_strength > 0:
+    #if args.denoiser_strength > 0:
         #denoiser = Denoiser(waveglow).cuda()
-        denoiser = Denoiser(waveglow).to(device)
+    #    denoiser = Denoiser(waveglow).to(device)
 
-    mel = torch.autograd.Variable(c.to(device))
+    mel = torch.autograd.Variable(mel.to(device))
     mel = torch.unsqueeze(mel, 0)
     mel = mel.half() if args.is_fp16 else mel
     print(f"waveglow actual input melspectrogram shape: {mel.shape}")
 
     with torch.no_grad():
         audio = waveglow.infer(mel, sigma=args.sigma)
-        if args.denoiser_strength  > 0:
+        if args.denoiser_strength > 0:
             audio = denoiser(audio, args.denoiser_strength)
-        #audio = audio * MAX_WAV_VALUE
+        audio = audio * MAX_WAV_VALUE
     audio = audio.squeeze()
     audio = audio.cpu().numpy()
     audio = audio.astype('int16')
@@ -121,14 +111,58 @@ def gen_waveform_waveglow(args, save_path, c, device):
 
 def get_mel(filename):
         melspec = np.load(filename)
-        #print(f"melspec shape: {melspec.shape}, num  of mel samples: {self.mel_samples}")
+        #print(f"melspec shape: {melspec.shape}")
         if melspec.shape[1] < config.mel_samples:
+            print(f'ground truth mel spec should not be here...')
             melspec_padded = np.zeros((melspec.shape[0], config.mel_samples))
             melspec_padded[:, 0:melspec.shape[1]] = melspec
         else:
             melspec_padded = melspec[:, 0:config.mel_samples]
         melspec_padded = torch.from_numpy(melspec_padded).float()
         return melspec_padded
+
+
+def final_try(args, config):
+    #mel_files = files_to_list(mel_files)
+    waveglow = torch.load(args.waveglow_path)['model']
+    waveglow = waveglow.remove_weightnorm(waveglow)
+    waveglow.cuda().eval()
+    if args.is_fp16:
+        from apex import amp
+        waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
+
+    if args.denoiser_strength > 0:
+        denoiser = Denoiser(waveglow).cuda()
+
+    # Load the audio
+    with open(config.test_files, encoding='utf-8') as f:
+        video_ids = [line.strip() for line in f]
+
+    mel_files = []
+    for id in video_ids:
+        file_path = os.path.join(config.mel_dir, id+"_mel.npy")
+        print(file_path)
+        mel_files.append(file_path)
+
+    for i, file_path in enumerate(mel_files):
+        file_name = os.path.splitext(os.path.basename(file_path))[0]
+        mel = np.load(file_path)
+        mel = torch.from_numpy(mel)
+        mel = torch.autograd.Variable(mel.cuda())
+        mel = torch.unsqueeze(mel, 0)
+        mel = mel.half() if args.is_fp16 else mel
+        with torch.no_grad():
+            audio = waveglow.infer(mel, sigma=args.sigma)
+            if args.denoiser_strength > 0:
+                audio = denoiser(audio, denoiser_strength)
+            audio = audio * MAX_WAV_VALUE
+        audio = audio.squeeze()
+        audio = audio.cpu().numpy()
+        audio = audio.astype('int16')
+        audio_path = os.path.join(
+            config.save_dir, "{}_synthesis.wav".format(file_name))
+        write(audio_path, args.sampling_rate, audio)
+        print(audio_path)
 
 
 def generate_audio(args, config):
@@ -142,13 +176,35 @@ def generate_audio(args, config):
 
     test_loader = []
     for id in video_ids:
-        mel = get_mel(os.path.join(config.mel_dir, id+"_mel.npy"))
+        #mel = get_mel(os.path.join(config.mel_dir, id+"_mel.npy"))
+        mel = np.load(os.path.join(config.mel_dir, id+"_mel.npy"))
+        mel = torch.from_numpy(mel)
         test_loader.append((id, mel))
 
     # Set up device and wavenet
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    wavenet_model = build_wavenet(config.wavenet_path, device)
-    for i,(id, mel_spec) in enumerate(test_loader):
+
+    if args.vocoder == 'wavenet':
+        # build wavenet
+        wavenet_model = build_wavenet(config.wavenet_path, device)
+    else:
+        # Set up waveglow
+        waveglow = torch.load(args.waveglow_path)['model']
+        waveglow = waveglow.remove_weightnorm(waveglow)
+        waveglow.cuda().eval()
+
+        if args.is_fp16:
+            print('using apex for waveglow')
+            from apex import amp
+            waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
+
+        if args.denoiser_strength > 0:
+            denoiser = Denoiser(waveglow).cuda()
+            #denoiser = Denoiser(waveglow).to(device)
+        else:
+            denoiser = None
+
+    for i,(id, mel_spec) in tqdm(enumerate(test_loader)):
         save_path = os.path.join(config.save_dir, id+"_gen_audio.wav")
         # Check the save dir exists
         if not os.path.exists(config.save_dir):
@@ -157,7 +213,7 @@ def generate_audio(args, config):
         if args.vocoder == 'wavenet':
             gen_waveform(wavenet_model, save_path, mel_spec, device, args)
         else:
-            gen_waveform_waveglow(args, save_path, mel_spec, device)
+            gen_waveform_waveglow(waveglow, args, save_path, mel_spec, device, denoiser=denoiser)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generates the audio listed in the test files of the config')
@@ -189,4 +245,5 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", config.cudnn_enabled)
     print("cuDNN Benchmark:", config.cudnn_benchmark)
 
-    generate_audio(args, config)
+    #generate_audio(args, config)
+    final_try(args, config)
