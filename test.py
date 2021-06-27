@@ -132,79 +132,62 @@ def test_model(args, config):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     wavenet_model = build_wavenet(config.wavenet_path, device) 
     with torch.no_grad():
-        for i, batch in enumerate(test_loader):
-            #if args.gt:
-            #    input, mel, video_name = batch
-            #    for j in range(len(mel)):
+        os.makedirs(config.save_dir, exist_ok=True)
+        with open(os.path.join(config.save_dir, 'mel_files.txt'), 'w') as file:
+            for i, batch in enumerate(test_loader):
+                #if args.gt:
+                #    input, mel, video_name = batch
+                #    for j in range(len(mel)):
                     # Use the vocoder to produce sound of the grount truth audio
-            #        mel_spec = mel[j].data
-            #        save_path = os.path.join(config.save_dir, video_name[j]+"_gt.wav")
-            #        if args.vocoder == 'wavenet':
-            #            gen_waveform(wavenet_model, save_path, mel_spec, device, args)
-            #        else:
-            #            gen_waveform_waveglow(args, save_path, mel_spec, device)
-            #    continue 
-            model.parse_batch(batch)
-            model.forward()            
-            for j in range(len(model.fake_B)):
-                plt.figure(figsize=(8, 9))
-                plt.subplot(311)
-                # model.real_B is the ground truth spectrogram
-                print(f"ground truth spec size: {model.real_B[j].data.cpu().numpy().shape}")
-                print("ground truth values: ", model.real_B[j].data.cpu().numpy())
-                print(f"ground truth max: {np.max(model.real_B[j].data.cpu().numpy())} and min: {np.min(model.real_B[j].data.cpu().numpy())}")
-                plt.imshow(model.real_B[j].data.cpu().numpy(), 
-                                aspect='auto', origin='lower')
-                plt.title(model.video_name[j]+"_ground_truth")
-                plt.subplot(312)
-                # model.fake_B is the generator's prediction
-                print(f"prediction spec size: {model.fake_B[j].data.cpu().numpy().shape}")
-                print("prediction values: ", model.fake_B[j].data.cpu().numpy())
-                print(f'prediction max: {np.max(model.fake_B[j].data.cpu().numpy())} and min: {np.min(model.fake_B[j].data.cpu().numpy())}')
-                plt.imshow(model.fake_B[j].data.cpu().numpy(), 
-                                aspect='auto', origin='lower')
-                plt.title(model.video_name[j]+"_predict")
-                plt.subplot(313)
-                # model.fake_B_postnet is the generator's postnet prediction
-                plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
-                                aspect='auto', origin='lower')
-                plt.title(model.video_name[j]+"_postnet")
-                plt.tight_layout()
-                os.makedirs(config.save_dir, exist_ok=True)
-                plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
-                plt.close()
-                # Saving the model prediction mel spec as numpy file
-                np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
-                          model.fake_B[j].data.cpu().numpy())
-                # Save ground truth as well
-                np.save(os.path.join(config.save_dir, model.video_name[j]+"_gt.npy"),
-                        model.real_B[j].data.cpu().numpy())
-                # Save postnet prediction
-                np.save(os.path.join(config.save_dir, model.video_name[j]+"_postnet.npy"),
-                        model.fake_B_postnet[j].data.cpu().numpy())
-                # Using the prediction mel spectrogram to generate sound
-                if args.gt:
-                    print("using ground truth melspectrograms for vocoder inference...")
-                    mel_spec = model.real_B[j].data.cpu().numpy()
-                    save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
-                else:
-                    mel_spec = model.fake_B[j].data.cpu().numpy()
-                    save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
+                #        mel_spec = mel[j].data
+                #        save_path = os.path.join(config.save_dir, video_name[j]+"_gt.wav")
+                #        if args.vocoder == 'wavenet':
+                #            gen_waveform(wavenet_model, save_path, mel_spec, device, args)
+                #        else:
+                #            gen_waveform_waveglow(args, save_path, mel_spec, device)
+                #    continue 
+                model.parse_batch(batch)
+                model.forward()            
+                for j in range(len(model.fake_B)):
+                    plt.figure(figsize=(8, 9))
+                    plt.subplot(311)
+                    # model.real_B is the ground truth spectrogram
+                    print(f"ground truth spec size: {model.real_B[j].data.cpu().numpy().shape}")
+                    print(f"ground truth max: {np.max(model.real_B[j].data.cpu().numpy())} and min: {np.min(model.real_B[j].data.cpu().numpy())}")
+                    plt.imshow(model.real_B[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_ground_truth")
+                    plt.subplot(312)
+                    # model.fake_B is the generator's prediction
+                    print(f"prediction spec size: {model.fake_B[j].data.cpu().numpy().shape}")
+                    print(f'prediction max: {np.max(model.fake_B[j].data.cpu().numpy())} and min: {np.min(model.fake_B[j].data.cpu().numpy())}')
+                    plt.imshow(model.fake_B[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_predict")
+                    plt.subplot(313)
+                    # model.fake_B_postnet is the generator's postnet prediction
+                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_postnet")
+                    plt.tight_layout()
 
-                if args.gt_and_pred:
-                    mel_spec_gt = model.real_B[j].data.cpu().numpy()
-                    save_path_gt = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
-                    mel_spec_pred = model.fake_B[j].data.cpu().numpy()
-                    save_path_pred = os.path.join(config.save_dir, model.video_name[j]+".wav")
-
-                    if args.vocoder == 'wavenet':
-                        gen_waveform(wavenet_model, save_path_gt, mel_spec_gt, device, args)
-                        gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
-                    else:
-                        print('For waveglow, run inference separately')
-                        #gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
-                        #gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
-                else:
+                    # Make sure save directory exists
+                    os.makedirs(config.save_dir, exist_ok=True)
+                    plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
+                    plt.close()
+                    file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
+                    file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
+                    
+                    # Saving the model prediction mel spec as numpy file
+                    np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
+                              model.fake_B[j].data.cpu().numpy())
+                    # Save ground truth as well
+                    np.save(os.path.join(config.save_dir, model.video_name[j]+"_gt.npy"),
+                            model.real_B[j].data.cpu().numpy())
+                    # Save postnet prediction
+                    #np.save(os.path.join(config.save_dir, model.video_name[j]+"_postnet.npy"),
+                    #        model.fake_B_postnet[j].data.cpu().numpy())
+                    # Using the prediction mel spectrogram to generate sound
                     if args.gt:
                         print("using ground truth melspectrograms for vocoder inference...")
                         mel_spec = model.real_B[j].data.cpu().numpy()
@@ -213,10 +196,33 @@ def test_model(args, config):
                         mel_spec = model.fake_B[j].data.cpu().numpy()
                         save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
 
-                    if args.vocoder == 'wavenet':
-                        gen_waveform(wavenet_model, save_path, mel_spec, device, args)
+                    if args.gt_and_pred:
+                        mel_spec_gt = model.real_B[j].data.cpu().numpy()
+                        save_path_gt = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
+                        mel_spec_pred = model.fake_B[j].data.cpu().numpy()
+                        save_path_pred = os.path.join(config.save_dir, model.video_name[j]+".wav")
+
+                        if args.vocoder == 'wavenet':
+                            gen_waveform(wavenet_model, save_path_gt, mel_spec_gt, device, args)
+                            gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
+                        else:
+                            print('For waveglow, run inference separately')
+                            #gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
+                            #gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
                     else:
-                        #gen_waveform_waveglow(args, save_path, mel_spec, device)
+                        if args.gt:
+                            print("using ground truth melspectrograms for vocoder inference...")
+                            mel_spec = model.real_B[j].data.cpu().numpy()
+                            save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
+                        else:
+                            mel_spec = model.fake_B[j].data.cpu().numpy()
+                            save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
+
+                        if args.vocoder == 'wavenet':
+                            gen_waveform(wavenet_model, save_path, mel_spec, device, args)
+                        else:
+                            print("Not immediately generating audio with waveglow")
+                            #gen_waveform_waveglow(args, save_path, mel_spec, device)
     model.train()
 
 if __name__ == '__main__':
