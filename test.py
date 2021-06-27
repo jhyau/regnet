@@ -173,8 +173,15 @@ def test_model(args, config):
                 os.makedirs(config.save_dir, exist_ok=True)
                 plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
                 plt.close()
+                # Saving the model prediction mel spec as numpy file
                 np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
                           model.fake_B[j].data.cpu().numpy())
+                # Save ground truth as well
+                np.save(os.path.join(config.save_dir, model.video_name[j]+"_gt.npy"),
+                        model.real_B[j].data.cpu().numpy())
+                # Save postnet prediction
+                np.save(os.path.join(config.save_dir, model.video_name[j]+"_postnet.npy"),
+                        model.fake_B_postnet[j].data.cpu().numpy())
                 # Using the prediction mel spectrogram to generate sound
                 if args.gt:
                     print("using ground truth melspectrograms for vocoder inference...")
@@ -194,8 +201,9 @@ def test_model(args, config):
                         gen_waveform(wavenet_model, save_path_gt, mel_spec_gt, device, args)
                         gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
                     else:
-                        gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
-                        gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
+                        print('For waveglow, run inference separately')
+                        #gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
+                        #gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
                 else:
                     if args.gt:
                         print("using ground truth melspectrograms for vocoder inference...")
@@ -208,7 +216,7 @@ def test_model(args, config):
                     if args.vocoder == 'wavenet':
                         gen_waveform(wavenet_model, save_path, mel_spec, device, args)
                     else:
-                        gen_waveform_waveglow(args, save_path, mel_spec, device)
+                        #gen_waveform_waveglow(args, save_path, mel_spec, device)
     model.train()
 
 if __name__ == '__main__':
