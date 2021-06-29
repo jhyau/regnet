@@ -38,7 +38,15 @@ if __name__ == '__main__':
     f.close()
 
     with open(P.join(output_dir, args.prefix+"_test.txt"), 'w') as f:
-        for video_path in video_paths[-n_test:]:
+        for video_path in video_paths[-n_test:int(-n_test/2)]:
+            f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
+        #for video_path in video_paths[-n_test:]:
+        #    f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
+    f.close()
+
+    # Separate test and validation set
+    with open(P.join(output_dir, args.prefix+"_true_test.txt", "w") as f:
+        for video_path in video_paths[int(-n_test/2):]:
             f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
     f.close()
-    print("Done splitting train and test")
+    print("Done splitting train and test and val")
