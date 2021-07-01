@@ -32,6 +32,7 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples, args):
 
     #mel_spec = mel_spec[:, :860]
     #assert(mel_samples == 1720)
+    save_dir = save_dir + '_orig_method'
     mel_spec = mel_spec[:, :mel_samples]
     print(f'wavenet melspectrogram shape: {mel_spec.shape}')
     os.makedirs(save_dir, exist_ok=True)
@@ -72,7 +73,7 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
     print(f'shape of melspec final: {melspec.shape}')
 
     # Separate waveglow mel specs for now
-    save_dir = save_dir + '_waveglow_mels'
+    #save_dir = save_dir + '_waveglow_mels'
     os.makedirs(save_dir, exist_ok=True)
     audio_name = os.path.basename(audio_path).split('.')[0]
     np.save(P.join(save_dir, audio_name + "_mel.npy"), melspec)

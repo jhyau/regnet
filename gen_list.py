@@ -29,6 +29,8 @@ if __name__ == '__main__':
         n_test = 128
     elif args.prefix in ["ASMR"]:
         n_test = 100
+    elif args.prefix in ["ASMR_test"]:
+        n_test = len(video_paths)
     else:
         n_test = 64
 
