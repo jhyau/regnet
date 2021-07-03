@@ -8,7 +8,7 @@ parser = argparse.ArgumentParser('This file will replace the audio, given a vide
 parser.add_argument('job_type', type=str, help='bulk (provide text file of videos to replace audio for) or single video')
 parser.add_argument('vid_path', type=str, help='Path to the video. If in bulk, then to directory of the videos')
 parser.add_argument('audio_path', type=str, help='Path to the audio to replace in the video. If in bulk, then to directory of audio files')
-parser.add_argument('output_path', type=str help='Path to output directory')
+parser.add_argument('output_path', type=str, help='Path to output directory')
 parser.add_argument('--save_title', type=str, default=None, help='Specify path/title to save the video. Defaults to None and will name new video normally')
 parser.add_argument('--file', type=str, default=None, help='path to file of videos to replace')
 args = parser.parse_args()
@@ -42,6 +42,6 @@ else:
         args.save_title = name+'.mp4'
     new_vid_name = os.path.join(args.output_path, args.save_title)
     print('Saving new video: ', new_vid_name)
-    os.system(f"ffmpeg -i {args.vid_path} -i {args.audio_path} -c:v copy -map 0:v:0 -map 1:a:0 {new_vid_name}")
+    os.system(f"ffmpeg -i {args.vid_path} -i {args.audio_path} -c:v copy -map 0:v:0 -map 1:a:0 {new_vid_name}.mp4")
 
 print("Done replacing the audio in video")

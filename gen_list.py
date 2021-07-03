@@ -7,7 +7,8 @@ if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="dataset/VEGAS/dog/videos")
     paser.add_argument("-o", "--output_dir", default="filelists")
-    paser.add_argument("-p", "--prefix", default="dog", choices=["dog", "fireworks", "baby", "drum", "gun", "sneeze", "cough", "hammer", "ASMR_1_Hr", "ASMR_3_Hrs", "ASMR_3_Hrs_fake_audio"])
+    #paser.add_argument("-p", "--prefix", default="dog", choices=["dog", "fireworks", "baby", "drum", "gun", "sneeze", "cough", "hammer", "ASMR_1_Hr", "ASMR_3_Hrs", "ASMR_3_Hrs_fake_audio"])
+    paser.add_argument("-p", "--prefix", default="dog")
     args = paser.parse_args()
     input_dir = args.input_dir
     output_dir = args.output_dir
@@ -47,7 +48,7 @@ if __name__ == '__main__':
     f.close()
 
     # Separate test and validation set
-    with open(P.join(output_dir, args.prefix+"_true_test.txt", "w") as f:
+    with open(P.join(output_dir, args.prefix+"_true_test.txt"), "w") as f:
         for video_path in video_paths[int(-n_test/2):]:
             f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
     f.close()
