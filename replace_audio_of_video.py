@@ -1,11 +1,11 @@
 import sys, os
 import argparse
-
+from glob import glob
 
 # ffmpeg -i v.mp4 -i a.wav -c:v copy -map 0:v:0 -map 1:a:0 new.mp4
 
 parser = argparse.ArgumentParser('This file will replace the audio, given a video')
-parser.add_argument('job_type', type=str, help='bulk (provide text file of videos to replace audio for) or single video')
+parser.add_argument('job_type', type=str, help='bulk (provide text file of videos to replace audio for), dir (replace video with all audio found in a directory), or single video')
 parser.add_argument('vid_path', type=str, help='Path to the video. If in bulk, then to directory of the videos')
 parser.add_argument('audio_path', type=str, help='Path to the audio to replace in the video. If in bulk, then to directory of audio files')
 parser.add_argument('output_path', type=str, help='Path to output directory')
@@ -36,12 +36,19 @@ if args.job_type == 'bulk':
             os.system(f"ffmpeg -i {vid} -i {audio_pred} -c:v copy -map 0:v:0 -map 1:a:0 {pred_vid}")
             os.system(f"ffmpeg -i {vid} -i {audio_gt} -c:v copy -map 0:v:0 -map 1:a:0 {gt_vid}")
             line = f.readline()
-else:
+elif args.job_type == 'single':
     if args.save_title is None:
         name = args.audio_path.split('/')[-1].split('.')[0]
         args.save_title = name+'.mp4'
     new_vid_name = os.path.join(args.output_path, args.save_title)
     print('Saving new video: ', new_vid_name)
     os.system(f"ffmpeg -i {args.vid_path} -i {args.audio_path} -c:v copy -map 0:v:0 -map 1:a:0 {new_vid_name}.mp4")
+else:
+    # Find all audio in the given audio directory and replace the audio for the given video with each audio found
+    wav_list = glob(os.path.join(args.audio_path, "*.wav"))
+    for wav in wav_list:
+        save_title = wav.split('/')[-1].split('.')[0]
+        vid_path = os.path.join(args.output_path, save_title+'.mp4')
+        os.system(f"ffmpeg -i {args.vid_path} -i {wav} -c:v copy -map 0:v:0 -map 1:a:0 {vid_path}")
 
 print("Done replacing the audio in video")
