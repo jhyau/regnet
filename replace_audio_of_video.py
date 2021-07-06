@@ -10,7 +10,7 @@ parser.add_argument('vid_path', type=str, help='Path to the video. If in bulk, t
 parser.add_argument('audio_path', type=str, help='Path to the audio to replace in the video. If in bulk, then to directory of audio files')
 parser.add_argument('output_path', type=str, help='Path to output directory')
 parser.add_argument('--save_title', type=str, default=None, help='Specify path/title to save the video. Defaults to None and will name new video normally')
-parser.add_argument('--file', type=str, default=None, help='path to file of videos to replace')
+parser.add_argument('--file', type=str, default=None, help='path to file of videos to replace (e.g. filelists/asmr_both_vids_test.txt) where each video name is listed per line')
 args = parser.parse_args()
 
 print('Replacing video with audio based on args: ', args)
