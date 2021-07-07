@@ -25,16 +25,16 @@ if args.job_type == 'bulk':
     with open(args.file, 'r') as f:
         line = f.readline()
         while (line):
-            vid = os.path.join(args.vid_path, line+'.mp4')
-            audio_pred = os.path.join(args.audio_path, line+'_synthesis.wav')
-            audio_gt = os.path.join(args.audio_path, line+'_gt_synthesis.wav')
+            vid = os.path.join(args.vid_path, line.strip()+'.mp4')
+            audio_pred = os.path.join(args.audio_path, line.strip()+'_synthesis.wav')
+            audio_gt = os.path.join(args.audio_path, line.strip()+'_gt_synthesis.wav')
             pred_vid = os.path.join(args.output_path, audio_pred.split('/')[-1].split('.')[0])
             gt_vid = os.path.join(args.output_path, audio_gt.split('/')[-1].split('.')[0])
             print('Saving video with prediction audio: ', pred_vid)
             print('Saving video with gt audio: ', gt_vid)
 
-            os.system(f"ffmpeg -i {vid} -i {audio_pred} -c:v copy -map 0:v:0 -map 1:a:0 {pred_vid}")
-            os.system(f"ffmpeg -i {vid} -i {audio_gt} -c:v copy -map 0:v:0 -map 1:a:0 {gt_vid}")
+            os.system(f"ffmpeg -i {vid} -i {audio_pred} -c:v copy -map 0:v:0 -map 1:a:0 {pred_vid}.mp4")
+            os.system(f"ffmpeg -i {vid} -i {audio_gt} -c:v copy -map 0:v:0 -map 1:a:0 {gt_vid}.mp4")
             line = f.readline()
 elif args.job_type == 'single':
     if args.save_title is None:
