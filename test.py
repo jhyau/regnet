@@ -169,6 +169,7 @@ def test_model(args, config):
                     plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
                     plt.title(model.video_name[j]+"_postnet")
+                    plt.xlabel('Time')
                     plt.tight_layout()
 
                     # Make sure save directory exists
