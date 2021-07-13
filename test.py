@@ -177,26 +177,36 @@ def test_model(args, config):
                     plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
                     plt.close()
 
-                    # Save a zoomed into plot so time dim is stretched out
-                    plt.figure(figsize=(8,9))
-                    plt.subplot(311)
-                    plt.imshow(model.real_B[j].data.cpu().numpy()[:,:344],
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_ground_truth_part1")
+                    # Save a zoomed-in plot so time dim is stretched out
+                    # Assuming the sample is 10 seconds, split to parts of 2 seconds
+                    step_size = config.mel_samples / 5
+                    for step in range(5):
+                        print(f"Starting time dim: {step*step_size}, ending time dim: {step_size*(step+1)}")
+                        plt.figure(figsize=(8,9))
+                        #extent = [step*step_size, step_size*(step+1), min(model.real_B[j].data.cpu().numpy().any()), max(model.real_B[j].data.cpu().numpy().any())]
+                        extent = [step*step_size, step_size*(step+1), 0, model.real_B[j].data.cpu().numpy().shape[0]] # For imshow of (m,n) array, image is m rows and n columns
+                        plt.subplot(311)
+                        plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                                    aspect='auto', origin='lower', extent=extent)
+                        plt.title(model.video_name[j]+"_ground_truth_part"+str(step))
 
-                    plt.subplot(312)
-                    plt.imshow(model.fake_B[j].data.cpu().numpy()[:,:344],
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_predict_part1")
+                        plt.subplot(312)
+                        #extent = [step*step_size, step_size*(step+1), min(model.fake_B[j].data.cpu().numpy().any()), max(model.fake_B[j].data.cpu().numpy().any())]
+                        extent = [step*step_size, step_size*(step+1), 0, model.fake_B[j].data.cpu().numpy().shape[0]]
+                        plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                                    aspect='auto', origin='lower', extent=extent)
+                        plt.title(model.video_name[j]+"_predict_part"+str(step))
 
-                    plt.subplot(313)
-                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,:344],
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_postnet_part1")
-                    plt.xlabel('Time')
-                    plt.tight_layout()
-                    plt.savefig(os.path.join(config.save_dir, model.video_name[j]+"_first_two_seconds.jpg"))
-                    plt.close()
+                        plt.subplot(313)
+                        #extent = [step*step_size, step_size*(step+1), min(model.fake_B_postnet[j].data.cpu().numpy().any()), max(model.fake_B_postnet[j].data.cpu().numpy().any())]
+                        extent = [step*step_size, step_size*(step+1), 0, model.fake_B_postnet[j].data.cpu().numpy().shape[0]]
+                        plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                                    aspect='auto', origin='lower', extent=extent)
+                        plt.title(model.video_name[j]+"_postnet_part"+str(step))
+                        plt.xlabel('Time')
+                        plt.tight_layout()
+                        plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}.jpg"))
+                        plt.close()
 
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
