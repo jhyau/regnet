@@ -17,16 +17,23 @@ landmarks = np.load('data/features/ASMR/asmr_both_vids/ASMR_Addictive_Tapping_1_
 #frame2 = Image.open('data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/ASMR_Addictive_Tapping_1_Hr_No_Talking-1-of-365/img_00009.jpg')
 
 # Get the frames' landmark coordinates, dims of (42, 3)
+print(f"Number of saved frames from the landmarks: {landmarks['arr_0'].shape}")
 frame1_raw = landmarks['arr_0'][29]
 frame2_raw = landmarks['arr_0'][30]
 
 # Get the original image frame, before resizing
-video = cv2.VideoCapture('data/features/ASMR/asmr_both_vids/videos_10s/ASMR_Addictive_Tapping_1_Hr_No_Talking-1-of-365.mp4')
+#video = cv2.VideoCapture('data/features/ASMR/asmr_both_vids/videos_10s/ASMR_Addictive_Tapping_1_Hr_No_Talking-1-of-365.mp4')
+video = cv2.VideoCapture('data/ASMR/orig_full_asmr_videos/ASMR_Addictive_Tapping_1_Hr_No_Talking.mp4')
 frame_count = 0
-img_width = video.get(3)
-img_height = video.get(4)
+frame_rate = video.get(cv2.CAP_PROP_FPS)
+img_width = video.get(cv2.CAP_PROP_FRAME_WIDTH)
+img_height = video.get(cv2.CAP_PROP_FRAME_HEIGHT)
+num_frames = video.get(cv2.CAP_PROP_FRAME_COUNT) # ID: 7
+#img_width = video.get(3)
+#img_height = video.get(4)
 print(f'width: {img_width} and height: {img_height}')
-print(f'Total number of frames in video: {video.get(7)}')
+print(f'Total number of frames in video: {num_frames}')
+print(f'FPS: {frame_rate}')
 
 frame1_points = []
 for i in range(frame1_raw.shape[0]):

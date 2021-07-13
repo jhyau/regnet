@@ -176,6 +176,28 @@ def test_model(args, config):
                     os.makedirs(config.save_dir, exist_ok=True)
                     plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
                     plt.close()
+
+                    # Save a zoomed into plot so time dim is stretched out
+                    plt.figure(figsize=(8,9))
+                    plt.subplot(311)
+                    plt.imshow(model.real_B[j].data.cpu().numpy()[:,:344],
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_ground_truth_part1")
+
+                    plt.subplot(312)
+                    plt.imshow(model.fake_B[j].data.cpu().numpy()[:,:344],
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_predict_part1")
+
+                    plt.subplot(313)
+                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,:344],
+                                    aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_postnet_part1")
+                    plt.xlabel('Time')
+                    plt.tight_layout()
+                    plt.savefig(os.path.join(config.save_dir, model.video_name[j]+"_first_two_seconds.jpg"))
+                    plt.close()
+
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
                     
