@@ -179,33 +179,46 @@ def test_model(args, config):
 
                     # Save a zoomed-in plot so time dim is stretched out
                     # Assuming the sample is 10 seconds, split to parts of 2 seconds
-                    step_size = config.mel_samples / 5
-                    for step in range(5):
-                        print(f"Starting time dim: {step*step_size}, ending time dim: {step_size*(step+1)}")
+                    num_plots = args.num_plots
+                    step_size = config.mel_samples / num_plots
+                    for step in range(num_plots):
+                        #print(f"Starting time dim: {step*step_size}, ending time dim: {step_size*(step+1)}")
                         plt.figure(figsize=(8,9))
                         #extent = [step*step_size, step_size*(step+1), min(model.real_B[j].data.cpu().numpy().any()), max(model.real_B[j].data.cpu().numpy().any())]
                         extent = [step*step_size, step_size*(step+1), 0, model.real_B[j].data.cpu().numpy().shape[0]] # For imshow of (m,n) array, image is m rows and n columns
                         plt.subplot(311)
-                        plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                        if step == num_plots-1:
+                            plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):],
+                                    aspect='auto', origin='lower', extent=extent)
+                        else:
+                            plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
                                     aspect='auto', origin='lower', extent=extent)
                         plt.title(model.video_name[j]+"_ground_truth_part"+str(step))
 
                         plt.subplot(312)
                         #extent = [step*step_size, step_size*(step+1), min(model.fake_B[j].data.cpu().numpy().any()), max(model.fake_B[j].data.cpu().numpy().any())]
                         extent = [step*step_size, step_size*(step+1), 0, model.fake_B[j].data.cpu().numpy().shape[0]]
-                        plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                        if step == num_plots-1:
+                            plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):],
+                                    aspect='auto', origin='lower', extent=extent)
+                        else:
+                            plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
                                     aspect='auto', origin='lower', extent=extent)
                         plt.title(model.video_name[j]+"_predict_part"+str(step))
 
                         plt.subplot(313)
                         #extent = [step*step_size, step_size*(step+1), min(model.fake_B_postnet[j].data.cpu().numpy().any()), max(model.fake_B_postnet[j].data.cpu().numpy().any())]
                         extent = [step*step_size, step_size*(step+1), 0, model.fake_B_postnet[j].data.cpu().numpy().shape[0]]
-                        plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
+                        if step == num_plots-1:
+                            plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):],
+                                    aspect='auto', origin='lower', extent=extent)
+                        else:
+                            plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
                                     aspect='auto', origin='lower', extent=extent)
                         plt.title(model.video_name[j]+"_postnet_part"+str(step))
                         plt.xlabel('Time')
                         plt.tight_layout()
-                        plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}.jpg"))
+                        plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}_of_{num_plots}.jpg"))
                         plt.close()
 
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
@@ -269,6 +282,7 @@ if __name__ == '__main__':
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
+    parser.add_argument('--num_plots', default=35, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
     parser.add_argument('--gt', action='store_true', help='generate only ground truth audio')
     parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio')
     parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
