@@ -91,12 +91,15 @@ class TSNDataSet(Dataset):
     def __getitem__(self, index):
         video_path = os.path.join(self.root_path, self.video_list[index])
         images = list()
-        if self.modality == 'RGB':          
-            num_frames = len(glob(os.path.join(video_path, "img*.jpg")))
+        if self.modality == 'RGB':
+            # Need to fix the regex for this one :(
+            #num_frames = len(glob(os.path.join(video_path, "img*.jpg")))
+            num_frames = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
         elif self.modality == 'RGB_landmarks':
             num_frames = len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
         elif self.modality == 'Flow':
             num_frames = len(glob(os.path.join(video_path, "flow_x*.jpg")))
+
         for ind in (np.arange(num_frames)+1):            
             images.extend(self._load_image(video_path, ind))
         process_data = self.transform(images)
@@ -135,7 +138,15 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    net = TSN(args.modality,            
+    print('args for extract features: ', args)
+    # For TSN, it currently only expects "RGB" else "flow", so just when calling the network, set modality to "RGB". Could add "RGB_landmarks" modality in the future if needed
+    if args.modality == 'RGB_landmarks':
+        modality = 'RGB'
+    else:
+        modality = args.modality
+
+    #net = TSN(args.modality,
+    net = TSN(modality,
             consensus_type=args.crop_fusion_type,
             dropout=args.dropout)
 
@@ -149,6 +160,8 @@ if __name__ == '__main__':
         image_tmpl="img_{:05d}_landmarks.jpg"
     else:
         image_tmpl=args.flow_prefix+"flow_{}_{:05d}.jpg"
+
+    print(f'Image template to retrieve the images: {image_tmpl}')
 
     data_loader = torch.utils.data.DataLoader(
             TSNDataSet(args.input_dir, args.test_list,
@@ -174,6 +187,7 @@ if __name__ == '__main__':
             length = 2
         input_var = torch.autograd.Variable(data.view(-1, length, data.size(2), data.size(3)),
                                             volatile=True)
+        #print('dimension: ', input_var.size())
         rst = np.squeeze(net(input_var).data.cpu().numpy().copy())
         pkl.dump(rst, open(ft_path, "wb"))
     print("Done with feature extraction")
