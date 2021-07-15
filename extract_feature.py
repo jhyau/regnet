@@ -41,7 +41,7 @@ class Stack(object):
     def __call__(self, img_group):
         if img_group[0].mode == 'L':
             return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2)
-        elif img_group[0].mode == 'RGB':
+        elif img_group[0].mode == 'RGB': # PIL Image.convert, can convert to different modes ("L", "RGB", "HSV", etc.)
             if self.roll:
                 return np.concatenate([np.array(x)[:, :, ::-1] for x in img_group], axis=2)
             else:
@@ -81,7 +81,7 @@ class TSNDataSet(Dataset):
         f.close()
 
     def _load_image(self, directory, idx):
-        if self.modality == 'RGB':
+        if self.modality == 'RGB' or self.modality == 'RGB_landmarks':
             return [Image.open(os.path.join(directory, self.image_tmpl.format(idx))).convert('RGB')]
         elif self.modality == 'Flow':
             x_img = Image.open(os.path.join(directory, self.image_tmpl.format('x', idx))).convert('L')
@@ -93,6 +93,8 @@ class TSNDataSet(Dataset):
         images = list()
         if self.modality == 'RGB':          
             num_frames = len(glob(os.path.join(video_path, "img*.jpg")))
+        elif self.modality == 'RGB_landmarks':
+            num_frames = len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
         elif self.modality == 'Flow':
             num_frames = len(glob(os.path.join(video_path, "flow_x*.jpg")))
         for ind in (np.arange(num_frames)+1):            
@@ -104,7 +106,7 @@ class TSNDataSet(Dataset):
         return len(self.video_list)
 
 def eval_video(data):
-    if args.modality == 'RGB':
+    if args.modality == 'RGB' or args.modality == 'RGB_landmarks':
         length = 3
     elif args.modality == 'Flow':
         length = 2
@@ -121,7 +123,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str)
     parser.add_argument('-o', '--output_dir', type=str)
-    parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'Flow'])
+    parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
     parser.add_argument('-t', '--test_list', type=str)
     parser.add_argument('--input_size', type=int, default=224)
     parser.add_argument('--crop_fusion_type', type=str, default='avg',
@@ -141,10 +143,18 @@ if __name__ == '__main__':
         GroupScale((net.input_size, net.input_size)),
     ])
 
+    if args.modality == 'RGB':
+        image_tmpl="img_{:05d}.jpg"
+    elif args.modality == 'RGB_landmarks':
+        image_tmpl="img_{:05d}_landmarks.jpg"
+    else:
+        image_tmpl=args.flow_prefix+"flow_{}_{:05d}.jpg"
+
     data_loader = torch.utils.data.DataLoader(
             TSNDataSet(args.input_dir, args.test_list,
                     modality=args.modality,
-                    image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
+                    #image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
+                    image_tmpl=image_tmpl,
                     transform=torchvision.transforms.Compose([
                         cropping, Stack(roll=True),
                         ToTorchFormatTensor(div=False),
@@ -158,7 +168,7 @@ if __name__ == '__main__':
     for i, (data, video_path) in enumerate(data_loader):
         os.makedirs(args.output_dir, exist_ok=True)
         ft_path = os.path.join(args.output_dir, video_path[0].split(os.sep)[-1]+".pkl")
-        if args.modality == 'RGB':
+        if args.modality == 'RGB' or args.modality == 'RGB_landmarks':
             length = 3
         elif args.modality == 'Flow':
             length = 2

@@ -7,6 +7,7 @@ duration_num=10
 mel_duration_num=$((44100 * duration_num))
 echo $mel_duration_num
 audio_sample_rate=44100
+video_fps=21.5
 filter_length=1024
 hop_length=256
 win_length=1024
@@ -16,6 +17,7 @@ vocoder="waveglow"
 num_mel_samples=1720
 echo $duration
 echo $audio_sample_rate
+echo $video_fps
 #for soundtype in $soundlist 
 #do
 
@@ -25,14 +27,15 @@ python extract_audio_and_video.py \
 -i data/ASMR/${dir_name} \
 -o data/features/ASMR/${dir_name} \
 -d ${duration_num} \
--a ${audio_sample_rate}
+-a ${audio_sample_rate} \
+-v ${video_fps}
 
 # Generating RGB frame and optical flow. This script uses CPU to calculate optical flow,
 # which may take a very long time. We strongly recommend you to refer to TSN repository 
 # (https://github.com/yjxiong/temporal-segment-networks) to speed up this process.
 python extract_rgb_flow.py \
--i data/features/ASMR/${dir_name}/videos_${duration}s_21.5fps \
--o data/features/ASMR/${dir_name}/OF_${duration}s_21.5fps
+-i data/features/ASMR/${dir_name}/videos_${duration}s_${video_fps}fps \
+-o data/features/ASMR/${dir_name}/OF_${duration}s_${video_fps}fps
 
 #Split training/testing list
 python gen_list.py \
