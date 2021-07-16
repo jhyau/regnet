@@ -478,7 +478,8 @@ class Regnet(nn.Module):
             for param_group in self.optimizers[index].param_groups:
                 param_group['lr'] = learning_rate
 
-    def save_checkpoint(self, save_directory, iteration):
+    def save_checkpoint(self, save_directory, iteration, do_not_delete=[], save_current=False):
+        # do_not_delete list of model_path checkpoints that shouldn't be deleted
         lr = self.optimizers[0].param_groups[0]['lr']
         for name in self.model_names:
             filepath = os.path.join(save_directory, "checkpoint_{:0>6d}_net{}".format(iteration, name))
@@ -495,10 +496,16 @@ class Regnet(nn.Module):
                             "learning_rate": lr,
                             "optimizer_net{}".format(name): net.cpu().state_dict()}, filepath)
 
+            if save_current:
+                do_not_delete.append(filepath)
+
             """delete old model"""
             model_list = glob.glob(os.path.join(save_directory, "checkpoint_*_*"))
             model_list.sort()
             for model_path in model_list[:-2]:
+                if model_path in do_not_delete:
+                    # Skip past the checkpoints that we want to keep
+                    continue
                 cmd = "rm {}".format(model_path)
                 print(cmd)
                 os.system(cmd)

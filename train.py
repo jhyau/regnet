@@ -72,6 +72,7 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                 print("Test loss epoch:{} iter:{} {:.6f} ".format(epoch, i, reduced_loss))
         logger.log_testing(np.mean(reduced_loss_), epoch)
     model.train()
+    return np.mean(reduced_loss_) # Return the average of loss over test set
 
 
 def train(args):
@@ -86,6 +87,10 @@ def train(args):
     logger = RegnetLogger(os.path.join(config.save_dir, 'logs'))
 
     train_loader, test_loader = prepare_dataloaders()
+
+    # Keep track of the lowest test evaluation loss achieved
+    lowest_test_loss = np.inf
+    do_not_delete = []
 
     # Load checkpoint if one exists
     iteration = 0
@@ -122,14 +127,27 @@ def train(args):
 
             iteration += 1
         if epoch % config.num_epoch_save != 0:
-            test_model(model, criterion, test_loader, epoch, logger)
+            test_loss = test_model(model, criterion, test_loader, epoch, logger)
+            if test_loss < lowest_test_loss:
+                lowest_test_loss = test_loss
+                print('Lower test loss! At epoch: ', epoch)
+                do_not_delete.clear() # Remove the previously saved do not delete checkpoint, since we got a lower test loss
+                model.save_checkpoint(config.save_dir, iteration, do_not_delete=do_not_delete, save_current=True)
+
         if epoch % config.num_epoch_save == 0:
             print("evaluation and save model")
-            test_model(model, criterion, test_loader, epoch, logger, visualization=True)
-            model.save_checkpoint(config.save_dir, iteration)
+            test_loss = test_model(model, criterion, test_loader, epoch, logger, visualization=True)
+            if test_loss < lowest_test_loss:
+                lowest_test_loss = test_loss
+                print('Lower test loss! At epoch: ', epoch)
+                do_not_delete.clear()
+                model.save_checkpoint(config.save_dir, iteration, do_not_delete=do_not_delete, save_current=True)
+            else:
+                # If test loss is not the minimum seen so far
+                model.save_checkpoint(config.save_dir, iteration, do_not_delete=do_not_delete)
 
         model.update_learning_rate()
-    model_path = model.save_checkpoint(config.save_dir, iteration)
+    model_path = model.save_checkpoint(config.save_dir, iteration, do_not_delete=do_not_delete)
 
 
 if __name__ == '__main__':
