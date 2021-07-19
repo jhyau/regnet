@@ -33,7 +33,8 @@ def cal_for_frames(video_path, output_dir, width, height):
     
 def compute_TVL1(prev, curr, bound=20):
     """Compute the TV-L1 optical flow."""
-    TVL1 = cv2.DualTVL1OpticalFlow_create()
+    #TVL1 = cv2.DualTVL1OpticalFlow_create()
+    TVL1 = cv2.optflow.DualTVL1OpticalFlow_create()
     flow = TVL1.calc(prev, curr, None)
     flow[flow>bound]=bound
     flow[flow<-bound]=-bound
