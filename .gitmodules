@@ -7,3 +7,6 @@
 [submodule "video-splitter"]
 	path = video-splitter
 	url = git@github.com:jhyau/video-splitter.git
+[submodule "ddsp"]
+	path = ddsp
+	url = git@github.com:jhyau/ddsp.git
