@@ -11,4 +11,4 @@ scipy
 sklearn
 tensorboard
 mediapipe
-ddsp
+#ddsp # Use the submodule version instead, with pip install -e .

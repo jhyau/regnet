@@ -58,6 +58,21 @@ conda install pytorch==1.7.1 torchvision==0.8.2 torchaudio==0.7.2 cudatoolkit=11
 ```
 instead of pytorch==1.2.0
 
+Note on DDSP: Instead of installing with the usual 
+```
+pip install ddsp
+```
+
+Navigate to the forked DDSP repo and run
+```
+pip install -e .
+```
+
+Another note: After installing ddsp, if there is an error for needing a newer version of tensorflow (e.g. >=2.5), upgrade the tensorflow installation with 
+```
+pip install tensorflow --upgrade
+```
+
 ### Download Datasets
 
 In our paper, we collect 8 sound types (Dog, Fireworks, Drum, Baby form [VEGAS][vegas] and Gun, Sneeze, Cough, Hammer from [AudioSet][audioset]) to build our [Visually Aligned Sound (VAS)][VAS] dataset.
