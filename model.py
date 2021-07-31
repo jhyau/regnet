@@ -419,7 +419,7 @@ class Regnet(nn.Module):
         self.device = torch.device('cuda:0')
         self.netG = init_net(Regnet_G(extra_upsampling), self.device)
         self.netD = init_net(Regnet_D(extra_upsampling), self.device)
-        self.criterionGAN = GANLoss().to(self.device)
+        self.criterionGAN = GANLoss().to(self.device) # Adversarial loss
         self.criterionL1 = RegnetLoss(config.loss_type).to(self.device)
 
         self.optimizers = []
@@ -542,6 +542,7 @@ class Regnet(nn.Module):
         self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
 
         self.loss_D.backward()
+        # Discriminator uses purely adversarial loss
 
     def backward_G(self):
         # First, G(A) should fake the discriminator
@@ -557,6 +558,7 @@ class Regnet(nn.Module):
         # Third, silence loss
         self.loss_G_silence = self.criterionL1((self.fake_B, self.fake_B_postnet), torch.zeros_like(self.real_B))
 
+        # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
         self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
 
         self.loss_G.backward()

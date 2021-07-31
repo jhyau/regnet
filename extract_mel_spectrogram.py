@@ -37,6 +37,7 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples, args):
     #print(f'wavenet melspectrogram shape: {mel_spec.shape}')
     os.makedirs(save_dir, exist_ok=True)
     audio_name = os.path.basename(audio_path).split('.')[0]
+    print("writing out to: ", P.join(save_dir, audio_name + "_mel.npy"))
     np.save(P.join(save_dir, audio_name + "_mel.npy"), mel_spec)
     np.save(P.join(save_dir, audio_name + "_audio.npy"), y)
 
