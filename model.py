@@ -411,7 +411,7 @@ def init_weights(net, init_type='normal', gain=0.02):
 
 
 class Regnet(nn.Module):
-    def __init__(self, extra_upsampling=False):
+    def __init__(self, extra_upsampling=False, adversarial_loss=True):
         super(Regnet, self).__init__()
         self.config = config
         self.n_mel_channels = config.n_mel_channels
@@ -431,9 +431,15 @@ class Regnet(nn.Module):
         self.optimizers.append(self.optimizer_D)
         self.D_interval = config.D_interval
         self.n_iter = -1
-        self.wo_G_GAN = config.wo_G_GAN
+        self.wo_G_GAN = config.wo_G_GAN # Set this parameter to True to exclude adversarial loss in the generator
         # add a parameter to indicate when to use extra upsampling layers in the docoder and discriminator (for 44100 audio sample rate)
         self.extra_upsampling = extra_upsampling
+        # add parameter to indicate whether or not to use adversarial loss when training
+        self.adversarial_loss = adversarial_loss
+        if not self.adversarial_loss:
+            if not self.wo_G_GAN:
+                print("Adversarial loss should not be used, but is being used for generator. Setting to false")
+                self.wo_G_GAN = True
 
     def parse_batch(self, batch):
         input, mel, video_name = batch
@@ -539,7 +545,11 @@ class Regnet(nn.Module):
         self.loss_D_real = self.criterionGAN(pred_real, True)
 
         # Combined loss
-        self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
+        if not self.adversarial_loss:
+            # If adversarial loss is set to False, set adversarial loss to 0
+            self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0
+        else:
+            self.loss_D = (self.loss_D_fake + self.loss_D_real) * 0.5
 
         self.loss_D.backward()
         # Discriminator uses purely adversarial loss
