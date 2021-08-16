@@ -6,15 +6,21 @@ import argparse
 from PIL import Image, ImageDraw
 from glob import glob
 from tqdm import tqdm
+import torch
 
 IMG_WIDTH = 340
 IMG_HEIGHT = 256
 
+# Landmarks
+HAND_LANDMARKS = ['WRIST', 'THUMB_CMC', 'THUMB_MCP', 'THUMB_IP', 'THUMB_TIP', 'INDEX_FINGER_MCP', 'INDEX_FINGER_PIP', 'INDEX_FINGER_DIP', 'INDEX_FINGER_TIP',
+        'MIDDLE_FINGER_MCP', 'MIDDLE_FINGER_PIP', 'MIDDLE_FINGER_DIP', 'MIDDLE_FINGER_TIP', 'RING_FINGER_MCP', 'RING_FINGER_PIP', 'RING_FINGER_DIP', 'RING_FINGER_TIP',
+        'PINKY_MCP', 'PINKY_PIP', 'PINKY_DIP', 'PINKY_TIP']
 
 # Argparser
 parser = argparse.ArgumentParser()
 parser.add_argument('dir_path', type=str, help='Path to the main directory of optical flow extractions')
 parser.add_argument('--min_conf', default=0.5, type=float, help='Minimum confidence for the hand landmarks detection. Defaults to 0.5')
+parser.add_argument('--no_plot', action='store_true', help='Include this flag to only output the landmarks without plotting')
 args = parser.parse_args()
 
 print(f'Args: {args}')
@@ -35,6 +41,12 @@ for video in tqdm(videos):
             max_num_hands=2,
             min_detection_confidence=args.min_conf) as hands:
         for idx, file in enumerate(rgb_images):
+            # Set up dictionary to save the landmarks and image width, height
+            coordinates = {}
+
+            # 3 coordinates, for 21 landmarks each hand, so total of 42 landmarks
+            coordinates['landmarks'] = np.zeros((42,3))
+
             # Read an image, flip it around y-axis for correct handedness output
             image = cv2.flip(cv2.imread(file), 1)
 
@@ -43,6 +55,7 @@ for video in tqdm(videos):
 
             # Draw hand landmarks on the image
             #print("Working on image: ", file)
+            title = file.split("/")[-1].split('.')[0]
             name = file.split("/")[-1].split('.')[0] + '_landmarks.jpg'
             #print(f"Handedness: {results.multi_handedness}")
             #if not results.multi_hand_landmarks:
@@ -50,13 +63,35 @@ for video in tqdm(videos):
                 #continue
             
             image_height, image_width, _ = image.shape
+
+            # Save the image height and width
+            coordinates['img_height'] = image_height
+            coordinates['img_width'] = image_width
+
             annotated_image = image.copy()
             if results.multi_hand_landmarks:
-                for hand_landmarks in results.multi_hand_landmarks:
+                # Iterating through each hand
+                print(f'Num hands: {len(results.multi_hand_landmarks)}')
+                for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                     #print(f"Hand landmarks: {hand_landmarks}")
-                    # Draw on the image
-                    mp_drawing.draw_landmarks(annotated_image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
-            cv2.imwrite(os.path.join(f'data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}/', name), cv2.flip(annotated_image, 1))
+
+                    for j,key in enumerate(HAND_LANDMARKS): # 21 landmarks per hand
+                        # Save the landmarks of the image in object file
+                        obj = getattr(mp_hands.HandLandmark, key)
+                        index = j + (i * 21)
+                        coordinates['landmarks'][index,:] = np.array([hand_landmarks.landmark[obj].x, hand_landmarks.landmark[obj].y, hand_landmarks.landmark[obj].z])
+
+                    if not args.no_plot:
+                        # Draw on the image
+                        mp_drawing.draw_landmarks(annotated_image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+            if not args.no_plot:
+                #cv2.imwrite(os.path.join(f'data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}/', name), cv2.flip(annotated_image, 1))
+                cv2.imwrite(os.path.join(os.path.join(args.dir_path, f'{video}/'), name), cv2.flip(annotated_image, 1))
+            # Saving the coordinate info
+            print(f"Saving to: {os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt')}")
+            torch.save(coordinates, os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt'))
+        break
 
 # Get the skeletal hand landmarks
 #landmarks = np.load('data/features/ASMR/asmr_both_vids/ASMR_Addictive_Tapping_1_Hr_No_Talking_skeletal/output-landmarks.npz', allow_pickle=True)
