@@ -62,6 +62,7 @@ for i in range(landmarks['landmarks'].shape[0]):
 draw = ImageDraw.Draw(img)
 draw.point(frame1_points)
 name = args.base_image.split('/')[-1].split('.')[0]
+print(f"Saving path: {os.path.join(args.save_path, name+'_verify.png')}")
 img.save(os.path.join(args.save_path, name+'_verify.png'), "PNG")
 
 #frame2_points=[]
@@ -84,5 +85,4 @@ img.save(os.path.join(args.save_path, name+'_verify.png'), "PNG")
 #        draw.point(frame2_points)
 #        curr.save('frame31_landmarks.png', "PNG")
 #        break
-                                                                                                                                                                                   101,104       96%
 

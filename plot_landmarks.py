@@ -36,6 +36,11 @@ for video in tqdm(videos):
     print("Getting landmarks for video: ", video)
     #all_images = os.listdir(f"data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}")
     rgb_images = glob(os.path.join(args.dir_path, f"{video}/img*.jpg"))
+    landmark_images = glob(os.path.join(args.dir_path, f"{video}/img*_landmarks.jpg"))
+
+    # No need to plot for already plotted images
+    if landmark_images:
+        rgb_images = list(set(rgb_images) - set(landmark_images))
     with mp_hands.Hands(
             static_image_mode=True,
             max_num_hands=2,
@@ -91,7 +96,6 @@ for video in tqdm(videos):
             # Saving the coordinate info
             print(f"Saving to: {os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt')}")
             torch.save(coordinates, os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt'))
-        break
 
 # Get the skeletal hand landmarks
 #landmarks = np.load('data/features/ASMR/asmr_both_vids/ASMR_Addictive_Tapping_1_Hr_No_Talking_skeletal/output-landmarks.npz', allow_pickle=True)
