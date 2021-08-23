@@ -185,6 +185,8 @@ if __name__ == '__main__':
             length = 3
         elif args.modality == 'Flow':
             length = 2
+
+        # Expected input_var shape: [216, 3, 224, 224]
         input_var = torch.autograd.Variable(data.view(-1, length, data.size(2), data.size(3)),
                                             volatile=True)
         #print('dimension: ', input_var.size())
