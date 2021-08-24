@@ -16,6 +16,8 @@ _C.exclude_dirs = ['ckpt', 'data']
 _C.training_files = 'filelists/dog_train.txt'
 _C.test_files = 'filelists/dog_test.txt'
 _C.rgb_feature_dir = "data/features/dog/feature_rgb_bninception_dim1024_21.5fps"
+# New: landmark feature dir
+_C.landmark_feature_dir = None
 _C.flow_feature_dir = "data/features/dog/feature_flow_bninception_dim1024_21.5fps"
 _C.mel_dir = "data/features/dog/melspec_10s_22050hz"
 _C.video_samples = 215

@@ -12,14 +12,15 @@ class RegnetLoader(torch.utils.data.Dataset):
     loads image, flow feature, mel-spectrogramsfiles
     """
 
-    def __init__(self, list_file, max_sample=-1):
+    def __init__(self, list_file, max_sample=-1, include_landmarks=True):
         self.video_samples = config.video_samples
         self.audio_samples = config.audio_samples
         self.mel_samples = config.mel_samples
+        self.include_landmarks = include_landmarks
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
-        print("Video IDs of dataset: ", self.video_ids)
+        #print("Video IDs of dataset: ", self.video_ids)
 
     def get_feature_mel_pair(self, video_id):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
@@ -28,7 +29,18 @@ class RegnetLoader(torch.utils.data.Dataset):
         im = self.get_im(im_path)
         flow = self.get_flow(flow_path)
         mel = self.get_mel(mel_path)
-        feature = np.concatenate((im, flow), 1)
+
+        if self.include_landmarks:
+            assert(config.landmark_feature_dir is not None)
+            land_path = os.path.join(config.landmark_feature_dir, video_id+".pkl")
+
+            # Landmark features are same dims as RGB feature
+            land = self.get_land(land_path)
+
+            # Since we concatenate landmark features as well, the visual dim will change to 3072 (parameter in config file)
+            feature = np.concatenate((im, land, flow), 1)
+        else:
+            feature = np.concatenate((im, flow), 1) # Visual dim=2048
         feature = torch.FloatTensor(feature.astype(np.float32))
         return (feature, mel, video_id)
 
@@ -66,6 +78,18 @@ class RegnetLoader(torch.utils.data.Dataset):
         else:
             flow_padded = flow[0:self.video_samples, :]
         return flow_padded
+
+    def get_land(self, land_path):
+        with open(land_path, 'rb') as f:
+            land = pickle.load(f, encoding='bytes')
+        f.close()
+        if land.shape[0] < self.video_samples:
+            land_padded = np.zeros((self.video_samples, land.shape[1]))
+            land_padded[0:land.shape[0], :] = land
+        else:
+            land_padded = land[0:self.video_samples, :]
+        assert land_padded.shape[0] == self.video_samples
+        return land_padded
 
     def __getitem__(self, index):
         return self.get_feature_mel_pair(self.video_ids[index])
