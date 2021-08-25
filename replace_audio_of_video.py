@@ -15,6 +15,9 @@ args = parser.parse_args()
 
 print('Replacing video with audio based on args: ', args)
 
+if not os.path.isdir(args.output_path):
+    os.path.mkdirs(args.output_path, exist_ok=True)
+
 # given list of videos, assumes that the audioes to replace will be the vocoder ground truth output as well as the vocoder regnet's prediction
 if args.job_type == 'bulk':
     if args.file is None:
