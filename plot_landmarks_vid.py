@@ -18,8 +18,11 @@ HAND_LANDMARKS = ['WRIST', 'THUMB_CMC', 'THUMB_MCP', 'THUMB_IP', 'THUMB_TIP', 'I
 
 # Argparser
 parser = argparse.ArgumentParser()
-parser.add_argument('dir_path', type=str, help='Path to the main directory of optical flow extractions')
-parser.add_argument('--min_conf', default=0.5, type=float, help='Minimum confidence for the hand landmarks detection. Defaults to 0.5')
+parser.add_argument('dir_path', type=str, help='Path to the main directory of videos')
+parser.add_argument('output_path', type=str, help="Path to save outputted frames")
+parser.add_argument('--specific_vid', type=str, default=None, help="Specify path to a specific video, if only want to plot for one video")
+parser.add_argument('--min_detect_conf', default=0.5, type=float, help='Minimum confidence for the hand landmarks detection. Defaults to 0.5')
+parser.add_argument('--min_tracking_conf', default=0.5, type=float, help="Minimum confidence for tracking hands in video. Defaults to 0.5")
 parser.add_argument('--no_plot', action='store_true', help='Include this flag to only output the landmarks without plotting')
 parser.add_argument('--stats', action='store_true', help="Include this flag to get statistics about the data set for landmarks")
 args = parser.parse_args()
@@ -29,6 +32,7 @@ print(f'Args: {args}')
 # Set up solution for tracking hands
 mp_drawing = mp.solutions.drawing_utils
 mp_hands = mp.solutions.hands
+#mp_drawing_styles = mp.solutions.drawing_styles
 
 # For each video, count number of frames that have less than 2 hands detected
 err_hands = {}
@@ -38,23 +42,49 @@ total_num_frames = 0
 # For static images, get the images
 videos = os.listdir(args.dir_path)
 for video in tqdm(videos):
+    if args.specific_vid is not None and args.specific_vid+'.mp4' != video:
+        continue
+
     # Get the images/frames from each video
     print("Getting landmarks for video: ", video)
-    #all_images = os.listdir(f"data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}")
-    rgb_images = glob(os.path.join(args.dir_path, f"{video}/img*.jpg"))
-    landmark_images = glob(os.path.join(args.dir_path, f"{video}/img*_landmarks.jpg"))
+    cap = cv2.VideoCapture(os.path.join(args.dir_path, video))
+    print(f"Frame rate: {cap.get(cv2.CAP_PROP_FPS)}")
+    print(f"Num frames in video: {cap.get(cv2.CAP_PROP_FRAME_COUNT)}")
+    
+    # Regnet optical flow extraction steps
+    _, prev = cap.read()
+    num = 1
+    prev = cv2.resize(prev, (340, 256))
+    #cv2.imwrite(P.join(save_dir, f"img_{num:05d}.jpg"), prev)
+    prev = cv2.cvtColor(prev, cv2.COLOR_BGR2GRAY)
 
-    # No need to plot for already plotted images
-    if landmark_images:
-        rgb_images = list(set(rgb_images) - set(landmark_images))
     with mp_hands.Hands(
-            static_image_mode=True,
+            static_image_mode=False,
             max_num_hands=2,
-            min_detection_confidence=args.min_conf) as hands:
+            min_detection_confidence=args.min_detect_conf,
+            min_tracking_confidence=args.min_tracking_conf) as hands:
 
         err_hands[video] = 0
         no_hands[video] = 0
-        for idx, file in enumerate(rgb_images):
+
+        while cap.isOpened():
+            success, image = cap.read()
+            if not success:
+                print("Ignoring empty camera frame")
+                # If loading a video, use 'break' instead of 'continue'.
+                break
+            
+            image = cv2.resize(image, (340, 256))
+            #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # Flip the image horizontally for a later selfie-view display, and convert
+            # the BGR image to RGB.
+            image = cv2.cvtColor(cv2.flip(image, 1), cv2.COLOR_BGR2RGB)
+            # To improve performance, optionally mark the image as not writeable to
+            # pass by reference.
+            image.flags.writeable = False
+            results = hands.process(image)
+
             # Set up dictionary to save the landmarks and image width, height
             coordinates = {}
             total_num_frames += 1
@@ -62,20 +92,14 @@ for video in tqdm(videos):
             # 3 coordinates, for 21 landmarks each hand, so total of 42 landmarks
             coordinates['landmarks'] = np.zeros((42,3))
 
-            # Read an image, flip it around y-axis for correct handedness output
-            image = cv2.flip(cv2.imread(file), 1)
-
-            # Make sure loaded image is RGB after getting results of tracking hands
-            results = hands.process(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-
             # Draw hand landmarks on the image
+            image.flags.writeable = True
+            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            
             #print("Working on image: ", file)
-            title = file.split("/")[-1].split('.')[0]
-            name = file.split("/")[-1].split('.')[0] + '_landmarks.jpg'
-            #print(f"Handedness: {results.multi_handedness}")
-            #if not results.multi_hand_landmarks:
-                # No results detected (or below min confidence probably)
-                #continue
+            #title = file.split("/")[-1].split('.')[0]
+            #name = file.split("/")[-1].split('.')[0] + '_landmarks_vid.jpg'
+            print(f"Handedness: {results.multi_handedness}")
             
             image_height, image_width, _ = image.shape
 
@@ -83,7 +107,7 @@ for video in tqdm(videos):
             coordinates['img_height'] = image_height
             coordinates['img_width'] = image_width
 
-            annotated_image = image.copy()
+            #annotated_image = image.copy()
             if results.multi_hand_landmarks:
                 # Iterating through each hand
                 print(f'Num hands: {len(results.multi_hand_landmarks)}')
@@ -102,30 +126,34 @@ for video in tqdm(videos):
 
                     if not args.no_plot and not args.stats:
                         # Draw on the image
-                        mp_drawing.draw_landmarks(annotated_image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                        #mp_drawing.draw_landmarks(annotated_image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                        mp_drawing.draw_landmarks(image, hand_landmarks, mp_hands.HAND_CONNECTIONS)
             else:
                 no_hands[video] += 1
 
             if not args.no_plot and not args.stats:
                 #cv2.imwrite(os.path.join(f'data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}/', name), cv2.flip(annotated_image, 1))
-                cv2.imwrite(os.path.join(os.path.join(args.dir_path, f'{video}/'), name), cv2.flip(annotated_image, 1))
+                cv2.imwrite(os.path.join(args.output_path, f'img_{num:05d}_landmarks_vid.jpg'), cv2.flip(image, 1))
             
             # Saving the coordinate info
             if not args.stats:
-                print(f"Saving to: {os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt')}")
-                torch.save(coordinates, os.path.join(os.path.join(args.dir_path, f'{video}/'), title + '.pt'))
+                print(f"Saving to: " + os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
+                torch.save(coordinates, os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
+            num += 1
+    cap.release()
 
 # Print out stats
-total_no_hands = 0
+no_hand = 0
+one_hand = 0
 for key in no_hands:
-    total_no_hands += no_hands[key]
+    no_hand += no_hands[key]
 
-total_one_hand = 0
 for key in err_hands:
-    total_one_hand += err_hands[key]
+    one_hand += err_hands[key]
 
-print(f"Num of frames with no hands: {total_no_hands} out of {total_num_frames}")
-print(f"Num of frames with one hand: {total_one_hand} out of {total_num_frames}")
+print(f"Frames without any hands detected: {no_hand} out of {total_num_frames}")
+print(f"Frames with only one hand detected: {one_hand} out of {total_num_frames}")
+
 
 # Get the skeletal hand landmarks
 #landmarks = np.load('data/features/ASMR/asmr_both_vids/ASMR_Addictive_Tapping_1_Hr_No_Talking_skeletal/output-landmarks.npz', allow_pickle=True)
