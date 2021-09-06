@@ -24,6 +24,7 @@ parser.add_argument('--specific_vid', type=str, default=None, help="Specify path
 parser.add_argument('--min_detect_conf', default=0.5, type=float, help='Minimum confidence for the hand landmarks detection. Defaults to 0.5')
 parser.add_argument('--min_tracking_conf', default=0.5, type=float, help="Minimum confidence for tracking hands in video. Defaults to 0.5")
 parser.add_argument('--no_plot', action='store_true', help='Include this flag to only output the landmarks without plotting')
+parser.add_argument('--no_coords', action='store_true', help="Include this flag to not save coordinates")
 parser.add_argument('--stats', action='store_true', help="Include this flag to get statistics about the data set for landmarks")
 args = parser.parse_args()
 
@@ -37,6 +38,7 @@ mp_hands = mp.solutions.hands
 # For each video, count number of frames that have less than 2 hands detected
 err_hands = {}
 no_hands = {} # Count when no hands are detected
+three_hands = {}
 total_num_frames = 0
 
 # For static images, get the images
@@ -66,6 +68,7 @@ for video in tqdm(videos):
 
         err_hands[video] = 0
         no_hands[video] = 0
+        three_hands[video] = 0
 
         while cap.isOpened():
             success, image = cap.read()
@@ -99,7 +102,7 @@ for video in tqdm(videos):
             #print("Working on image: ", file)
             #title = file.split("/")[-1].split('.')[0]
             #name = file.split("/")[-1].split('.')[0] + '_landmarks_vid.jpg'
-            print(f"Handedness: {results.multi_handedness}")
+            #print(f"Handedness: {results.multi_handedness}")
             
             image_height, image_width, _ = image.shape
 
@@ -110,19 +113,30 @@ for video in tqdm(videos):
             #annotated_image = image.copy()
             if results.multi_hand_landmarks:
                 # Iterating through each hand
-                print(f'Num hands: {len(results.multi_hand_landmarks)}')
+                #print(f'Num hands: {len(results.multi_hand_landmarks)}')
                 if len(results.multi_hand_landmarks) < 2:
                     err_hands[video] += 1
+
+                if len(results.multi_hand_landmarks) > 2:
+                    print("LOL what is happening: ", video)
+                    print("num hands: ", len(results.multi_hand_landmarks))
+                    #print(f"Hand landmarks: {results.multi_hand_landmarks}")
+                    print(f"Handedness: {results.multi_handedness}")
+                    three_hands[video] += 1
+
+                if args.stats:
+                    continue
 
                 for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                     #print(f"Hand landmarks: {hand_landmarks}")
                     # Match the left hand to first 21 rows and right hand to lower 21 rows
-
-                    for j,key in enumerate(HAND_LANDMARKS): # 21 landmarks per hand
-                        # Save the landmarks of the image in object file
-                        obj = getattr(mp_hands.HandLandmark, key)
-                        index = j + (i * 21)
-                        coordinates['landmarks'][index,:] = np.array([hand_landmarks.landmark[obj].x, hand_landmarks.landmark[obj].y, hand_landmarks.landmark[obj].z])
+                    
+                    if not args.stats and not args.no_coords:
+                        for j,key in enumerate(HAND_LANDMARKS): # 21 landmarks per hand
+                            # Save the landmarks of the image in object file
+                            obj = getattr(mp_hands.HandLandmark, key)
+                            index = j + (i * 21)
+                            coordinates['landmarks'][index,:] = np.array([hand_landmarks.landmark[obj].x, hand_landmarks.landmark[obj].y, hand_landmarks.landmark[obj].z])
 
                     if not args.no_plot and not args.stats:
                         # Draw on the image
@@ -133,27 +147,44 @@ for video in tqdm(videos):
 
             if not args.no_plot and not args.stats:
                 #cv2.imwrite(os.path.join(f'data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}/', name), cv2.flip(annotated_image, 1))
-                cv2.imwrite(os.path.join(args.output_path, f'img_{num:05d}_landmarks_vid.jpg'), cv2.flip(image, 1))
+                if not os.path.isdir(args.output_path):
+                    os.mkdirs(args.output_path, exist_ok=True)
+
+                if args.specific_vid is None:
+                    title = video.split(".")[0]
+                    #title = file.split("/")[-1].split('.')[0]
+                    #name = file.split("/")[-1].split('.')[0] + '_landmarks_vid.jpg'
+                    cv2.imwrite(os.path.join(os.path.join(args.output_path, f'{title}/'), f"img_{num:05d}_landmarks_vid.jpg"))
+                else:
+                    cv2.imwrite(os.path.join(args.output_path, f'img_{num:05d}_landmarks_vid.jpg'), cv2.flip(image, 1))
             
             # Saving the coordinate info
-            if not args.stats:
-                print(f"Saving to: " + os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
-                torch.save(coordinates, os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
+            if not args.stats and not args.no_coords:
+                if args.specific_vid is not None:
+                    print(f"Saving to: " + os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
+                    torch.save(coordinates, os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
+                else:
+                    title = video.split(".")[0]
+                    print(f"Saving to: " + os.path.join(os.path.join(args.output_path, f'{title}/'), f'img_{num:05d}_vid.pt'))
+                    torch.save(coordinates, os.path.join(os.path.join(args.output_path, f'{title}/'), f'img_{num:05d}_vid.pt'))
             num += 1
     cap.release()
 
 # Print out stats
 no_hand = 0
 one_hand = 0
+multi_hand = 0
 for key in no_hands:
     no_hand += no_hands[key]
 
 for key in err_hands:
     one_hand += err_hands[key]
 
+for key in three_hands:
+    multi_hand += three_hands[key]
 print(f"Frames without any hands detected: {no_hand} out of {total_num_frames}")
 print(f"Frames with only one hand detected: {one_hand} out of {total_num_frames}")
-
+print(f"Frames with more than two hands detected: {multi_hand} out of {total_num_frames}")
 
 # Get the skeletal hand landmarks
 #landmarks = np.load('data/features/ASMR/asmr_both_vids/ASMR_Addictive_Tapping_1_Hr_No_Talking_skeletal/output-landmarks.npz', allow_pickle=True)
