@@ -93,7 +93,7 @@ for video in tqdm(videos):
             total_num_frames += 1
 
             # 3 coordinates, for 21 landmarks each hand, so total of 42 landmarks
-            coordinates['landmarks'] = np.zeros((42,3))
+            coordinates['landmarks'] = np.zeros((42,3)) # Left hand should be top 21 rows, right bottom 21 rows
 
             # Draw hand landmarks on the image
             image.flags.writeable = True
@@ -122,6 +122,8 @@ for video in tqdm(videos):
                     print("num hands: ", len(results.multi_hand_landmarks))
                     #print(f"Hand landmarks: {results.multi_hand_landmarks}")
                     print(f"Handedness: {results.multi_handedness}")
+                    # Identify which is the extra hand to exclude
+                    import pdb; pdb.set_trace()
                     three_hands[video] += 1
 
                 if args.stats:
@@ -130,7 +132,8 @@ for video in tqdm(videos):
                 for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
                     #print(f"Hand landmarks: {hand_landmarks}")
                     # Match the left hand to first 21 rows and right hand to lower 21 rows
-                    
+                    # results.multi_handedness[0].classification[0].label
+                    handedness = results.multi_handedness[i].classification[0].label 
                     if not args.stats and not args.no_coords:
                         for j,key in enumerate(HAND_LANDMARKS): # 21 landmarks per hand
                             # Save the landmarks of the image in object file
@@ -169,6 +172,7 @@ for video in tqdm(videos):
                     torch.save(coordinates, os.path.join(os.path.join(args.output_path, f'{title}/'), f'img_{num:05d}_vid.pt'))
             num += 1
     cap.release()
+    break
 
 # Print out stats
 no_hand = 0
