@@ -41,6 +41,57 @@ no_hands = {} # Count when no hands are detected
 three_hands = {}
 total_num_frames = 0
 
+
+def handle_multiple_detected_hands(hand_detection_results):
+    """Determines which two detected hands should be returned to have the coordinates saved"""
+    num_results = len(hand_detection_results.multi_handedness)
+    verify = len(hand_detection_results.multi_hand_landmarks)
+    assert(num_results == verify)
+
+    # If there is only one hand detected
+    if len(hand_detection_results.multi_hand_landmarks) == 1:
+        handedness = hand_detection_results.multi_handedness[0].classification[0].label
+        results = []
+        results.append((handedness, hand_detection_results.multi_hand_landmarks[0]))
+        return results
+
+    left_scores = {'max': 0, 'min': float('inf')}
+    right_scores = {'max': 0, 'min': float("inf")}
+    results = [] # Returns a list of tuples (handedness, hand_landmarks). Should have only 2 elements
+    for i in range(num_results):
+        handedness = hand_detection_results.multi_handedness[i].classification[0].label
+        score = hand_detection_results.multi_handedness[i].classification[0].score
+        if handedness == "Left" and score > left_scores['max']:
+            left_scores['max'] = score
+            left = hand_detection_results.multi_hand_landmarks[i]
+        
+        if handedness == "Right" and score > right_scores['max']:
+            right_scores['max'] = score
+            right = hand_detection_results.multi_hand_landmarks[i]
+        
+        if handedness == "Right" and score < right_scores['min']:
+            right_scores['min'] = score
+            left_backup = hand_detection_results.multi_hand_landmarks[i]
+        
+        if handedness == "Left" and score < left_scores['min']:
+            left_scores['min'] = score
+            right_backup = hand_detection_results.multi_hand_landmarks[i]
+    
+    # Choose which two landmarks should be used
+    #print("left scores: ", left_scores)
+    #print("right scores: ", right_scores)
+    if left_scores['max'] > 0:
+        results.append(('Left', left))
+    else:
+        results.append(("Left", left_backup))
+
+    if right_scores['max'] > 0:
+        results.append(("Right", right))
+    else:
+        results.append(("Right", right_backup))
+    return results
+
+
 # For static images, get the images
 videos = os.listdir(args.dir_path)
 for video in tqdm(videos):
@@ -118,27 +169,36 @@ for video in tqdm(videos):
                     err_hands[video] += 1
 
                 if len(results.multi_hand_landmarks) > 2:
-                    print("LOL what is happening: ", video)
-                    print("num hands: ", len(results.multi_hand_landmarks))
+                    #print("LOL what is happening: ", video)
+                    #print("num hands: ", len(results.multi_hand_landmarks))
                     #print(f"Hand landmarks: {results.multi_hand_landmarks}")
-                    print(f"Handedness: {results.multi_handedness}")
+                    #print(f"Handedness: {results.multi_handedness}")
                     # Identify which is the extra hand to exclude
-                    import pdb; pdb.set_trace()
+                    #import pdb; pdb.set_trace()
                     three_hands[video] += 1
+
+                results_to_use = handle_multiple_detected_hands(results)
+                #print("Number of usable results: ", len(results_to_use))
 
                 if args.stats:
                     continue
 
-                for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
+                #for i, hand_landmarks in enumerate(results.multi_hand_landmarks):
+                for i, (handedness, hand_landmarks) in enumerate(results_to_use):
                     #print(f"Hand landmarks: {hand_landmarks}")
                     # Match the left hand to first 21 rows and right hand to lower 21 rows
                     # results.multi_handedness[0].classification[0].label
-                    handedness = results.multi_handedness[i].classification[0].label 
+                    #handedness = results.multi_handedness[i].classification[0].label
+                    if handedness == "Left":
+                        row = 0
+                    else:
+                        row = 1
+
                     if not args.stats and not args.no_coords:
                         for j,key in enumerate(HAND_LANDMARKS): # 21 landmarks per hand
                             # Save the landmarks of the image in object file
                             obj = getattr(mp_hands.HandLandmark, key)
-                            index = j + (i * 21)
+                            index = j + (row * 21)
                             coordinates['landmarks'][index,:] = np.array([hand_landmarks.landmark[obj].x, hand_landmarks.landmark[obj].y, hand_landmarks.landmark[obj].z])
 
                     if not args.no_plot and not args.stats:
@@ -148,31 +208,36 @@ for video in tqdm(videos):
             else:
                 no_hands[video] += 1
 
+            # Saving plotted images
             if not args.no_plot and not args.stats:
                 #cv2.imwrite(os.path.join(f'data/features/ASMR/asmr_both_vids/OF_10s_21.5fps/{video}/', name), cv2.flip(annotated_image, 1))
                 if not os.path.isdir(args.output_path):
-                    os.mkdirs(args.output_path, exist_ok=True)
+                    os.makedirs(args.output_path, exist_ok=True)
 
                 if args.specific_vid is None:
                     title = video.split(".")[0]
+                    os.makedirs(os.path.join(args.output_path, f"{title}/"), exist_ok=True)
                     #title = file.split("/")[-1].split('.')[0]
                     #name = file.split("/")[-1].split('.')[0] + '_landmarks_vid.jpg'
-                    cv2.imwrite(os.path.join(os.path.join(args.output_path, f'{title}/'), f"img_{num:05d}_landmarks_vid.jpg"))
+                    cv2.imwrite(os.path.join(os.path.join(args.output_path, f'{title}/'), f"img_{num:05d}_landmarks_vid.jpg"), cv2.flip(image, 1))
                 else:
                     cv2.imwrite(os.path.join(args.output_path, f'img_{num:05d}_landmarks_vid.jpg'), cv2.flip(image, 1))
             
             # Saving the coordinate info
             if not args.stats and not args.no_coords:
+                if not os.path.isdir(args.output_path):
+                    os.makedirs(args.output_path, exist_ok=True)
+
                 if args.specific_vid is not None:
                     print(f"Saving to: " + os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
                     torch.save(coordinates, os.path.join(args.output_path, f'img_{num:05d}_vid.pt'))
                 else:
                     title = video.split(".")[0]
+                    os.makedirs(os.path.join(args.output_path, f"{title}/"), exist_ok=True)
                     print(f"Saving to: " + os.path.join(os.path.join(args.output_path, f'{title}/'), f'img_{num:05d}_vid.pt'))
                     torch.save(coordinates, os.path.join(os.path.join(args.output_path, f'{title}/'), f'img_{num:05d}_vid.pt'))
             num += 1
     cap.release()
-    break
 
 # Print out stats
 no_hand = 0
