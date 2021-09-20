@@ -40,7 +40,7 @@ class Stack(object):
 
 class LandmarksDataset(Dataset):
     def __init__(self, root_path, list_file,
-                 landmarks_tmpl='img_{:05d}.pt', transform=None):
+                 landmarks_tmpl='img_{:05d}_vid.pt', transform=None):
 
         self.root_path = root_path
         self.list_file = list_file
@@ -53,7 +53,11 @@ class LandmarksDataset(Dataset):
     def __getitem__(self, index):
         video_path = os.path.join(self.root_path, self.video_list[index])
         landmarks = list()
-        num_frames = len(glob(os.path.join(video_path, "img*.pt"))) - len(glob(os.path.join(video_path, "img*_landmarks.pt")))
+        #num_frames = len(glob(os.path.join(video_path, "img*.pt"))) - len(glob(os.path.join(video_path, "img*_landmarks.pt")))
+        num_frames = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks*.jpg")))
+        #num_frames = len(glob(os.path.join(video_path, "img*_vid.pt")))
+        assert(num_frames == len(glob(os.path.join(video_path, "flow_x_*.jpg"))))
+        assert(num_frames == len(glob(os.path.join(video_path, "flow_y_*.jpg"))))
 
         for ind in (np.arange(num_frames)+1):
             # Store each landmark coordinate array into the list
@@ -98,8 +102,10 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net).cuda()
     net.eval()
 
+    os.makedirs(args.output_dir, exist_ok=True)
+
     for i, (data, video_path) in enumerate(tqdm(data_loader)):
-        os.makedirs(args.output_dir, exist_ok=True)
+        #os.makedirs(args.output_dir, exist_ok=True)
         ft_path = os.path.join(args.output_dir, video_path[0].split(os.sep)[-1]+".pkl")
         # Check shape of input
         input_var = torch.squeeze(data).float()

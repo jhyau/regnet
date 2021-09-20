@@ -38,7 +38,8 @@ class RegnetLoader(torch.utils.data.Dataset):
             land = self.get_land(land_path)
 
             # Since we concatenate landmark features as well, the visual dim will change to 3072 (parameter in config file)
-            feature = np.concatenate((im, land, flow), 1)
+            # Concatenate landmark features at the end of the feature vector, so RGB+optical flow+landmarks
+            feature = np.concatenate((im, flow, land), 1)
         else:
             feature = np.concatenate((im, flow), 1) # Visual dim=2048
         feature = torch.FloatTensor(feature.astype(np.float32))
