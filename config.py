@@ -25,6 +25,13 @@ _C.audio_samples = 10
 _C.mel_samples = 860
 _C.visual_dim = 2048
 _C.n_mel_channels = 80
+# Including pairing/misalignment loss
+_C.pairing_loss = True
+_C.num_misalign_frames = 10
+# Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
+_C.extra_upsampling = True
+# Include landmark featuers
+_C.include_landmarks = False
 
 # Encoder parameters
 _C.random_z_dim = 512

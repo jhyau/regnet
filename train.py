@@ -23,8 +23,11 @@ from tqdm import tqdm
 
 def prepare_dataloaders(args):
     # Get data, data loaders and collate function ready
-    trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
-    valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
+    #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
+    #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
+    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks)
+    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks)
+
 
     train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
@@ -80,7 +83,8 @@ def train(args):
     torch.cuda.manual_seed(config.seed)
 
     # Include the extra_upsampling parameter
-    model = Regnet(extra_upsampling=args.extra_upsampling, adversarial_loss=args.adversarial_loss)
+    #model = Regnet(extra_upsampling=args.extra_upsampling, adversarial_loss=args.adversarial_loss)
+    model = Regnet(extra_upsampling=config.extra_upsampling,adversarial_loss=args.adversarial_loss)
 
     criterion = RegnetLoss(config.loss_type)
 
@@ -152,9 +156,9 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--extra_upsampling', action='store_true', help='include flag to add extra upsampling layers in the decoder and discriminator to match 44100 audio sample rate')
+    #parser.add_argument('--extra_upsampling', action='store_true', help='include flag to add extra upsampling layers in the decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument('--no_adversarial_loss', dest='adversarial_loss', action='store_false', help='include this flag to set adversarial loss to False, so GAN loss will not be used')
-    parser.add_argument('--include_landmarks', action='store_true', help='Include flag to concatenate skeletal landmark features to the feature vector')
+    #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to concatenate skeletal landmark features to the feature vector')
     parser.add_argument('-c', '--config_file', type=str, default='',
                         help='file for configuration')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)

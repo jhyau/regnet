@@ -17,6 +17,8 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.audio_samples = config.audio_samples
         self.mel_samples = config.mel_samples
         self.include_landmarks = include_landmarks
+        self.pairing_loss = config.pairing_loss
+        self.num_misalign_frames = config.num_misalign_frames
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
@@ -43,7 +45,12 @@ class RegnetLoader(torch.utils.data.Dataset):
         else:
             feature = np.concatenate((im, flow), 1) # Visual dim=2048
         feature = torch.FloatTensor(feature.astype(np.float32))
-        return (feature, mel, video_id)
+        if not self.pairing_loss:
+            return (feature, mel, video_id)
+        #else:
+            # Shift forward and backward by num_misalign_frames
+            # Note that the video_samples should be < 216 (or whatever is max num frames of the loaded feature vectors) to allow for shifting
+            
 
     def get_mel(self, filename):
         melspec = np.load(filename)
