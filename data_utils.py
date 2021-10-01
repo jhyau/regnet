@@ -19,6 +19,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.include_landmarks = include_landmarks
         self.pairing_loss = config.pairing_loss
         self.num_misalign_frames = config.num_misalign_frames
+        self.reduced_video_samples = config.reduced_video_samples
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
@@ -31,6 +32,26 @@ class RegnetLoader(torch.utils.data.Dataset):
         im = self.get_im(im_path)
         flow = self.get_flow(flow_path)
         mel = self.get_mel(mel_path)
+
+        if self.pairing_loss:
+            # Shift forward and backward by num_misalign_frames
+            # Note that the video_samples should be < 216 (or whatever is max num frames of the loaded feature vectors) to allow for shifting
+            im_center = im[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+            flow_center = flow[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+            if self.include_landmarks:
+                assert(config.landmark_feature_dir is not None)
+                land_path = os.path.join(config.landmark_feature_dir, video_id+".pkl")
+
+                # Landmark features are same dims as RGB feature
+                land = self.get_land(land_path)
+                land_center = land[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+                
+                # TODO: Get mel spectrograms matching those shifts
+                # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
+                # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
+
+
+    
 
         if self.include_landmarks:
             assert(config.landmark_feature_dir is not None)
@@ -45,12 +66,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         else:
             feature = np.concatenate((im, flow), 1) # Visual dim=2048
         feature = torch.FloatTensor(feature.astype(np.float32))
-        if not self.pairing_loss:
-            return (feature, mel, video_id)
-        #else:
-            # Shift forward and backward by num_misalign_frames
-            # Note that the video_samples should be < 216 (or whatever is max num frames of the loaded feature vectors) to allow for shifting
-            
+        return (feature, mel, video_id)
 
     def get_mel(self, filename):
         melspec = np.load(filename)
