@@ -26,6 +26,7 @@ _C.mel_samples = 860
 _C.visual_dim = 2048  # Feature vector length. 1024 (rgb) + 1024 (flow) = 2048. becomes 3072 if include landmark feature vector
 _C.n_mel_channels = 80
 # Including pairing/misalignment loss
+_C.video_fps = 21.5 # Video fps. Default is 21.5, but for asmr videos, it actually is 30
 _C.pairing_loss = True
 _C.num_misalign_frames = 10
 _C.reduced_video_samples = 100 # Reduced number of frames to allow misaligning

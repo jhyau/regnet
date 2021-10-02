@@ -20,6 +20,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.pairing_loss = config.pairing_loss
         self.num_misalign_frames = config.num_misalign_frames
         self.reduced_video_samples = config.reduced_video_samples
+        self.video_fps = config.video_fps
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
@@ -36,21 +37,33 @@ class RegnetLoader(torch.utils.data.Dataset):
         if self.pairing_loss:
             # Shift forward and backward by num_misalign_frames
             # Note that the video_samples should be < 216 (or whatever is max num frames of the loaded feature vectors) to allow for shifting
-            im_center = im[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
-            flow_center = flow[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+            im_center = self.get_feature_subset(im, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
+            #im_center = im[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+            #flow_center = flow[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+            flow_center = self.get_feature_subset(flow, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
             if self.include_landmarks:
                 assert(config.landmark_feature_dir is not None)
                 land_path = os.path.join(config.landmark_feature_dir, video_id+".pkl")
 
                 # Landmark features are same dims as RGB feature
                 land = self.get_land(land_path)
-                land_center = land[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+                #land_center = land[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
+                land_center = self.get_feature_subset(land, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
                 
-                # TODO: Get mel spectrograms matching those shifts
                 # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
                 # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
+                mel_center_start = int(self.num_misalign_frames / self.video_fps)
+                mel_center_end = int((self.num_misalign_frames+self.reduced_video_samples) / self.video_fps)
+                mel_center = mel[:, mel_center_start:mel_center_end]
 
+                # TODO: Create the examples to be loaded by the model
+                feature_center = np.concatenate((im_center, flow_center, land_center), 1)
 
+                # Center example (include label: 1 if aligned, 0 if misaligned)
+                ex_center = (feature_center, mel_center, video_id, 1)
+
+            else:
+                feature_center = np.concatenate((im_center, flow_center), 1)
     
 
         if self.include_landmarks:
@@ -114,6 +127,11 @@ class RegnetLoader(torch.utils.data.Dataset):
             land_padded = land[0:self.video_samples, :]
         assert land_padded.shape[0] == self.video_samples
         return land_padded
+
+    def get_feature_subset(self, feature, start_idx, end_idx):
+        """Expects one of three possible feature vectors: im (rgb), flow (optical flow), or land (hand landmarks vector)"""
+        feat_subset = feature[start_idx:(start_idx+self.reduced_video_samples), :]
+        return feat_subset
 
     def __getitem__(self, index):
         return self.get_feature_mel_pair(self.video_ids[index])
