@@ -41,6 +41,23 @@ class RegnetLoader(torch.utils.data.Dataset):
             #im_center = im[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
             #flow_center = flow[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
             flow_center = self.get_feature_subset(flow, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
+
+            # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
+            # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
+            #mel_center_start = int(self.num_misalign_frames / self.video_fps)
+            #mel_center_end = int((self.num_misalign_frames+self.reduced_video_samples) / self.video_fps)
+            #mel_center = mel[:, mel_center_start:mel_center_end]
+            mel_center = self.get_mel_subset(mel, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
+
+            # Calculate the backward and forward shifts
+            im_back = self.get_feature_subset(im, 0, self.reduced_video_samples)
+            flow_back = self.get_feature_subset(flow, 0, self.reduced_video_samples)
+            mel_back = self.get_mel_subset(mel, 0, self.reduced_video_samples)
+
+            im_for = self.get_feature_subset(im, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
+            flow_for = self.get_feature_subset(flow, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
+            mel_for = self.get_mel_subset(mel, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
+
             if self.include_landmarks:
                 assert(config.landmark_feature_dir is not None)
                 land_path = os.path.join(config.landmark_feature_dir, video_id+".pkl")
@@ -49,21 +66,42 @@ class RegnetLoader(torch.utils.data.Dataset):
                 land = self.get_land(land_path)
                 #land_center = land[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
                 land_center = self.get_feature_subset(land, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
-                
-                # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
-                # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
-                mel_center_start = int(self.num_misalign_frames / self.video_fps)
-                mel_center_end = int((self.num_misalign_frames+self.reduced_video_samples) / self.video_fps)
-                mel_center = mel[:, mel_center_start:mel_center_end]
+                land_back = self.get_feature_subset(land, 0, self.reduced_video_samples)
+                land_for = self.get_feature_subset(land, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
 
-                # TODO: Create the examples to be loaded by the model
+                # Create the examples to be loaded by the model
                 feature_center = np.concatenate((im_center, flow_center, land_center), 1)
-
-                # Center example (include label: 1 if aligned, 0 if misaligned)
-                ex_center = (feature_center, mel_center, video_id, 1)
-
+                feature_back = np.concatenate((im_back, flow_back, land_back), 1)
+                feature_for = np.concatenate((im_for, flow_for, land_for), 1)
             else:
                 feature_center = np.concatenate((im_center, flow_center), 1)
+                feature_back = np.concatenate((im_back, flow_back), 1)
+                feature_for = np.concatenate((im_for, flow_for), 1)
+
+            feature_center = torch.FloatTensor(feature_center.astype(np.float32))
+            feature_back = torch.FloatTensor(feature_back.astype(np.float32))
+            feature_for = torch.FloatTensor(feature_for.astype(np.float32))
+
+            # Return the examples for pairing loss
+            # Center example (include label: 1 if aligned, 0 if misaligned)
+            ex_center = (feature_center, mel_center, video_id, 1)
+            ex_center_mis_back = (feature_center, mel_back, video_id, 0)
+            ex_center_mis_for = (feature_center, mel_for, video_id, 0)
+
+            # Backward examples
+            ex_back = (feature_back, mel_back, video_id, 1)
+            ex_back_mis_cen = (feature_back, mel_center, video_id, 0)
+            ex_back_mis_for = (feature_back, mel_for, video_id, 0)
+
+            # Forward examples
+            ex_for = (feature_for, mel_for, video_id, 1)
+            ex_for_mis_cen = (feature_for, mel_center, video_id, 0)
+            ex_for_mis_back = (feature_for, mel_back, video_id, 0)
+
+            # Return a tuple of examples (each a tuple as well)
+            return (ex_center, ex_center_mis_back, ex_center_mis_for,
+                    ex_back, ex_back_mis_cen, ex_back_mis_for,
+                    ex_for, ex_for_mis_cen, ex_for_mis_back)
     
 
         if self.include_landmarks:
@@ -132,6 +170,14 @@ class RegnetLoader(torch.utils.data.Dataset):
         """Expects one of three possible feature vectors: im (rgb), flow (optical flow), or land (hand landmarks vector)"""
         feat_subset = feature[start_idx:(start_idx+self.reduced_video_samples), :]
         return feat_subset
+
+    def get_mel_subset(self, mel, start_frame, end_frame):
+        # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
+        # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
+        mel_center_start = int(start_frame / self.video_fps)
+        mel_center_end = int((start_frame+self.reduced_video_samples) / self.video_fps)
+        mel_center = mel[:, mel_center_start:mel_center_end]
+        return mel_center
 
     def __getitem__(self, index):
         return self.get_feature_mel_pair(self.video_ids[index])

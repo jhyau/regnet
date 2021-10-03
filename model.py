@@ -378,6 +378,25 @@ class GANLoss(nn.Module):
         return self.loss(input, target_tensor)
 
 
+class TemporalAlignmentLoss(nn.Module):
+    """Discriminate betweeen aligned or misaligned input/target
+    'real' for aligned and 'fake' for misaligned
+    """
+    def __init__(self, target_real_label=1.0, target_fake_label=0.0):
+        super(TemporalAlignmentLoss, self).__init__()
+        self.register_buffer('real_label', torch.tensor(target_real_label))
+        self.register_buffer('fake_label', torch.tensor(target_fake_label))
+        self.loss = nn.BCEWithLogitsLoss() #sigmoid + BCE loss
+
+    def __call__(self, input, target):
+        """
+        Input should be video feature and audio, to discriminate. Instead of before, which was both audio,
+        to discriminate between 'real' (ground truth mel) and 'fake' (generator mel)
+        """
+        return self.loss(input, target)
+        
+
+
 def init_net(net, device, init_type='normal', init_gain=0.02):
     assert (torch.cuda.is_available())
     net.to(device)

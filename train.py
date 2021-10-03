@@ -28,6 +28,8 @@ def prepare_dataloaders(args):
     trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks)
     valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks)
 
+    # TODO: Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used
+
 
     train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
