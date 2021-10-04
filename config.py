@@ -30,6 +30,7 @@ _C.video_fps = 21.5 # Video fps. Default is 21.5, but for asmr videos, it actual
 _C.pairing_loss = True
 _C.num_misalign_frames = 10
 _C.reduced_video_samples = 100 # Reduced number of frames to allow misaligning
+_C.reduced_mel_samples = 860
 # Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
 _C.extra_upsampling = True
 # Include landmark featuers

@@ -130,7 +130,11 @@ class Auxiliary_lstm_last(nn.Module):
         self.BiLSTM = nn.LSTM(config.n_mel_channels, int(config.auxiliary_dim), 2,
                            batch_first=True, bidirectional=True)
         self.BiLSTM_proj = nn.Linear(config.auxiliary_dim, config.auxiliary_dim)
-        self.video_samples = config.video_samples 
+        # Check if using pairing loss (would use reduced time dim)
+        if config.pairing_loss:
+            self.video_samples = config.reduced_video_samples
+        else:
+            self.video_samples = config.video_samples 
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -149,8 +153,13 @@ class Auxiliary_lstm_sample(nn.Module):
         self.BiLSTM = nn.LSTM(config.n_mel_channels, int(config.auxiliary_dim/2), 2,
                            batch_first=True, bidirectional=True)
         self.auxiliary_sample_rate = config.auxiliary_sample_rate
-        self.mel_samples = config.mel_samples
-        self.video_samples = config.video_samples
+
+        if config.pairing_loss:
+            self.mel_samples = config.reduced_mel_samples
+            self.video_samples = config.reduced_video_samples
+        else:
+            self.video_samples = config.video_samples
+            self.mel_samples = config.mel_samples
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -275,7 +284,7 @@ class Regnet_G(nn.Module):
         #print(f"Mode input for the generator: {self.mode_input}")
         encoder_output = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
-        #print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
+        print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
         if self.aux_zero:
             gt_auxilitary = gt_auxilitary * 0
             #print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
@@ -346,13 +355,16 @@ class Regnet_D(nn.Module):
 
     def forward(self, *inputs):
         feature, mel = inputs
-        #print(f"discriminator feature shape: {feature.size()}, mel shape: {mel.size()}")
+        print(f"discriminator feature shape: {feature.size()}, mel shape: {mel.size()}")
         feature_conv = self.feature_conv(feature.transpose(1, 2))
         mel_conv = self.mel_conv(mel)
-        #print(f"discriminator after transform feature shape: {feature_conv.size()}, mel shape: {mel_conv.size()}")
+        print(f"discriminator after transform feature shape: {feature_conv.size()}, mel shape: {mel_conv.size()}")
         input_cat = torch.cat((feature_conv, mel_conv), 1)
         out = self.down_sampling(input_cat)
-        out = nn.Sigmoid()(out)
+        
+        if not config.pairing_loss:
+            print("Using sigmoid for discriminator output...")
+            out = nn.Sigmoid()(out) # Needed if using BCELoss, but sigmoid is already included in BCELossWithLogits
         return out
 
 
@@ -438,7 +450,12 @@ class Regnet(nn.Module):
         self.device = torch.device('cuda:0')
         self.netG = init_net(Regnet_G(extra_upsampling), self.device)
         self.netD = init_net(Regnet_D(extra_upsampling), self.device)
-        self.criterionGAN = GANLoss().to(self.device) # Adversarial loss
+
+        # Set to pairing loss
+        if config.pairing_loss:
+            self.criterionGAN = TemporalAlignmentLoss().to(self.device)
+        else:
+            self.criterionGAN = GANLoss().to(self.device) # Adversarial loss
         self.criterionL1 = RegnetLoss(config.loss_type).to(self.device)
 
         self.optimizers = []
@@ -467,9 +484,79 @@ class Regnet(nn.Module):
         self.video_name = video_name
         #print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}')
 
+    def parse_batch_pairing_loss(self, batch):
+        """Use this function to parse in the batch of examples based on pairing loss"""
+        # There are 9 different sets of examples for pairing loss: 6 misaligned, 3 aligned
+        cen, cen_mis_back, cen_mis_for, back, back_mis_cen, back_mis_for, forward, forward_mis_cen, forward_mis_back = batch
+
+        # Set all the input video features and audio for the model
+        self.video_name = cen[2]
+        assert(self.video_name == back[2])
+        assert(self.video_name == forward_mis_cen[2])
+        assert(self.video_name == back_mis_for[2])
+
+        print("example visual vector shape: ", cen[0].shape)
+        print("example mel shape: ", cen[1].shape)
+
+        # A is video feature vector, B is mel spec audio
+        # Align: video is center, audio is center
+        self.real_A_cen = cen[0]
+        self.real_B_cen = cen[1]
+        self.cen_label = cen[-1]
+
+        # Misalign: video is center, audio is shifted back
+        self.real_A_cen_mis_back = cen_mis_back[0]
+        self.real_B_cen_mis_back = cen_mis_back[1]
+        self.cen_mis_back_label = cen_mis_back[-1]
+
+        # Misalign: video is center, audio is shifted forward
+        self.real_A_cen_mis_for = cen_mis_for[0]
+        self.real_B_cen_mis_for = cen_mis_for[1]
+        self.cen_mis_for_label = cen_mis_for[-1]
+
+        # Align: video is back, audio is back
+        self.real_A_back = back[0]
+        self.real_B_back = back[1]
+        self.back_label = back[-1]
+
+        # Misalign: video is back, audio is center
+        self.real_A_back_mis_cen = back_mis_cen[0]
+        self.real_B_back_mis_cen = back_mis_cen[1]
+        self.back_mis_cen_label = back_mis_cen[-1]
+
+        # Misalign: video is back, audio is forward
+        self.real_A_back_mis_for = back_mis_for[0]
+        self.real_B_back_mis_for = back_mis_for[1]
+        self.back_mis_for_label = back_mis_for[-1]
+
+        # Align: video is forward, audio is forward
+        self.real_A_for = forward[0]
+        self.real_B_for = forward[1]
+        self.for_label = forward[-1]
+
+        # Misalign: video is forward, audio is center
+        self.real_A_for_mis_cen = forward_mis_cen[0]
+        self.real_B_for_mis_cen = forward_mis_cen[1]
+        self.for_mis_cen_label = forward_mis_cen[-1]
+
+        # Misalign: video is forward, audio is back
+        self.real_A_for_mis_back = forward_mis_back[0]
+        self.real_B_for_mis_back = forward_mis_back[1]
+        self.for_mis_back_label = forward_mis_back[-1]
+
+
     def forward(self):
         self.fake_B, self.fake_B_postnet = self.netG(self.real_A, self.real_B)
         #print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
+
+    def forward_pairing_loss(self):
+        # Have the generator predict for the three aligned examples
+        print(f"input sample shape: {self.real_A_cen.shape} and {self.real_B_cen.shape}")
+        self.fake_B_cen, self.fake_B_cen_postnet = self.netG(self.real_A_cen, self.real_B_cen)
+        self.fake_B_back, self.fake_B_back_postnet = self.netG(self.real_A_back, self.real_B_back)
+        self.fake_B_for, self.fake_B_for_postnet = self.netG(self.real_A_for, self.real_B_for)
+
+        print(f"Output generated shape: {self.fake_B_cen.shape} and {self.fake_B_cen_postnet.shape}") 
 
     def get_scheduler(self, optimizer, config):
         def lambda_rule(epoch):
@@ -573,6 +660,17 @@ class Regnet(nn.Module):
         self.loss_D.backward()
         # Discriminator uses purely adversarial loss
 
+    def backward_D_pairing_loss(self):
+        """Discriminator backprop using pairing loss"""
+        # Use all 9 examples, starting with the 6 misaligned "fake" examples
+        # Need to detach to prevent backproping through generator with these fake examples
+        pred_fake_center_mis_back = self.netD(self.real_A_cen_mis_back.detach(), self.real_B_cen_mis_back.detach())
+        self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
+        print("discriminator output: ", self.pred_fake_center_mis_back)
+        self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, False)
+        print("pairing loss: ", self.loss_D_fake_center_mis_back)
+        
+
     def backward_G(self):
         # First, G(A) should fake the discriminator
         if not self.wo_G_GAN:
@@ -594,12 +692,22 @@ class Regnet(nn.Module):
 
     def optimize_parameters(self):
         self.n_iter += 1
-        self.forward()
+
+        # Determine which forward function to use
+        if config.pairing_loss:
+            self.forward_pairing_loss()
+        else:
+            self.forward()
+
         # update D
         if self.n_iter % self.D_interval == 0:
             self.set_requires_grad(self.netD, True)
             self.optimizer_D.zero_grad()
-            self.backward_D()
+
+            if config.pairing_loss:
+                self.backward_D_pairing_loss()
+            else:
+                self.backward_D()
             self.optimizer_D.step()
 
         # update G

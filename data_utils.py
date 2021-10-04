@@ -1,6 +1,7 @@
 import os
 import pickle
 import random
+import math
 import numpy as np
 import torch
 import torch.utils.data
@@ -12,14 +13,15 @@ class RegnetLoader(torch.utils.data.Dataset):
     loads image, flow feature, mel-spectrogramsfiles
     """
 
-    def __init__(self, list_file, max_sample=-1, include_landmarks=True):
+    def __init__(self, list_file, max_sample=-1, include_landmarks=True, pairing_loss=True):
         self.video_samples = config.video_samples
         self.audio_samples = config.audio_samples
         self.mel_samples = config.mel_samples
         self.include_landmarks = include_landmarks
-        self.pairing_loss = config.pairing_loss
+        self.pairing_loss = pairing_loss
         self.num_misalign_frames = config.num_misalign_frames
         self.reduced_video_samples = config.reduced_video_samples
+        self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
 
         with open(list_file, encoding='utf-8') as f:
@@ -98,6 +100,11 @@ class RegnetLoader(torch.utils.data.Dataset):
             ex_for_mis_cen = (feature_for, mel_center, video_id, 0)
             ex_for_mis_back = (feature_for, mel_back, video_id, 0)
 
+            assert(np.array_equal(feature_back[self.num_misalign_frames:, :], feature_center[:-self.num_misalign_frames, :]))
+            
+            mel_center_start = math.floor((self.num_misalign_frames / self.video_fps) * (self.mel_samples/self.audio_samples))
+            assert(np.array_equal(mel_back[:, mel_center_start:], mel_center[:, :-mel_center_start])) 
+
             # Return a tuple of examples (each a tuple as well)
             return (ex_center, ex_center_mis_back, ex_center_mis_for,
                     ex_back, ex_back_mis_cen, ex_back_mis_for,
@@ -167,15 +174,25 @@ class RegnetLoader(torch.utils.data.Dataset):
         return land_padded
 
     def get_feature_subset(self, feature, start_idx, end_idx):
-        """Expects one of three possible feature vectors: im (rgb), flow (optical flow), or land (hand landmarks vector)"""
+        """Expects one of three possible feature vectors: im (rgb), flow (optical flow), or land (hand landmarks vector)
+        Dimensions expected: (video_sample, 1024)
+        """
         feat_subset = feature[start_idx:(start_idx+self.reduced_video_samples), :]
         return feat_subset
 
     def get_mel_subset(self, mel, start_frame, end_frame):
+        """Expected dimensions for mel spectrogram: (n_mel_channels, mel_samples)"""
         # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
         # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
-        mel_center_start = int(start_frame / self.video_fps)
-        mel_center_end = int((start_frame+self.reduced_video_samples) / self.video_fps)
+        one_second = self.mel_samples / self.audio_samples
+        mel_center_start = math.floor((start_frame / self.video_fps) * one_second)
+        mel_center_end = math.floor(((start_frame+self.reduced_video_samples) / self.video_fps) * one_second)
+
+        # Force the mel spectrogram to match mel_samples shape
+        if (mel_center_end - mel_center_start) > self.reduced_mel_samples:
+            mel_center_end = mel_center_end - ((mel_center_end - mel_center_start) - self.reduced_mel_samples)
+
+        #print(f"mel start: {mel_center_start} and mel end: {mel_center_end}")
         mel_center = mel[:, mel_center_start:mel_center_end]
         return mel_center
 

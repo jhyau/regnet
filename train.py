@@ -25,12 +25,10 @@ def prepare_dataloaders(args):
     # Get data, data loaders and collate function ready
     #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
-    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks)
-    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks)
+    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
-    # TODO: Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used
-
-
+    # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
     train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
                               drop_last=True)
@@ -48,29 +46,86 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
     reduced_loss_ = []
     with torch.no_grad():
         for i, batch in enumerate(test_loader):
-            model.parse_batch(batch)
-            model.forward()
-            if visualization:
-                for j in range(len(model.fake_B)):
-                    plt.figure(figsize=(8, 9))
-                    plt.subplot(311)
-                    plt.imshow(model.real_B[j].data.cpu().numpy(), 
+            # Check if using pairing loss
+            if config.pairing_loss:
+                model.parse_batch_pairing_loss(batch)
+                model.forward_pairing_loss()
+
+                if visualization:
+                    for j in range(len(model.fake_B_cen)):
+                        # Center aligned
+                        plt.figure(figsize=(8, 9))
+                        plt.subplot(311)
+                        plt.imshow(model.real_B_cen[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_ground_truth")
-                    plt.subplot(312)
-                    plt.imshow(model.fake_B[j].data.cpu().numpy(), 
+                        plt.title(model.video_name[j]+"center_ground_truth")
+                        plt.subplot(312)
+                        plt.imshow(model.fake_B_cen[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_predict")
-                    plt.subplot(313)
-                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
+                        plt.title(model.video_name[j]+"center_predict")
+                        plt.subplot(313)
+                        plt.imshow(model.fake_B_cen_postnet[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_postnet")
-                    plt.tight_layout()
-                    viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
-                    os.makedirs(viz_dir, exist_ok=True)
-                    plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
-                    plt.close()
-            loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
+                        plt.title(model.video_name[j]+"center_postnet")
+
+                        # Back aligned
+                        plt.subplot(314)
+                        plt.imshow(model.real_B_back[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"back_ground_truth")
+                        plt.subplot(315)
+                        plt.imshow(model.fake_B_back[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"back_predict")
+                        plt.subplot(316)
+                        plt.imshow(model.fake_B_back_postnet[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"back_postnet")
+
+                        # Forward aligned
+                        plt.subplot(317)
+                        plt.imshow(model.real_B_for[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"for_ground_truth")
+                        plt.subplot(318)
+                        plt.imshow(model.fake_B_for[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"for_predict")
+                        plt.subplot(319)
+                        plt.imshow(model.fake_B_for_postnet[j].data.cpu().numpy(),
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"for_postnet")
+                # Calculate the loss of the three examples
+                loss_cen = criterion((model.fake_B_cen, model.fake_B_cen_postnet), model.real_B_cen)
+                loss_back = criterion((model.fake_B_back, model.fake_B_back_postnet), model.real_B_back)
+                loss_for = criterion((model.fake_B_for, model.fake_B_for_postnet), model.real_B_for)
+                loss = (1.0/3) * loss_cen + (1.0/3) * loss_back + (1.0/3)*loss_for
+            else:
+                model.parse_batch(batch)
+                model.forward()
+                if visualization:
+                    for j in range(len(model.fake_B)):
+                        plt.figure(figsize=(8, 9))
+                        plt.subplot(311)
+                        plt.imshow(model.real_B[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"_ground_truth")
+                        plt.subplot(312)
+                        plt.imshow(model.fake_B[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"_predict")
+                        plt.subplot(313)
+                        plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
+                                    aspect='auto', origin='lower')
+                        plt.title(model.video_name[j]+"_postnet")
+                loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
+            plt.tight_layout()
+            viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
+            os.makedirs(viz_dir, exist_ok=True)
+            plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
+            plt.close()
+
+            #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):
@@ -119,12 +174,27 @@ def train(args):
         for i, batch in enumerate(train_loader):
             start = time.perf_counter()
             model.zero_grad()
-            model.parse_batch(batch)
+
+            # Use a different parse_batch and forward function if using pairing loss
+            if config.pairing_loss:
+                model.parse_batch_pairing_loss(batch)
+            else:
+                model.parse_batch(batch)
+            
             model.optimize_parameters()
             learning_rate = model.optimizers[0].param_groups[0]['lr']
-            loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
+
+            if config.pairing_loss:
+                # Need to take into account all 3 aligned examples
+                loss_cen = criterion((model.fake_B_cen, model.fake_B_cen_postnet), model.real_B_cen)
+                loss_back = criterion((model.fake_B_back, model.fake_B_back_postnet), model.real_B_back)
+                loss_for = criterion((model.fake_B_for, model.fake_B_for_postnet), model.real_B_for)
+                loss = (1.0/3) * loss_cen + (1.0/3) * loss_back + (1.0/3)*loss_for 
+            else:
+                loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
 
+            break
             if not math.isnan(reduced_loss):
                 duration = time.perf_counter() - start
                 print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
