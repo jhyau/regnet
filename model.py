@@ -405,6 +405,7 @@ class TemporalAlignmentLoss(nn.Module):
         Input should be video feature and audio, to discriminate. Instead of before, which was both audio,
         to discriminate between 'real' (ground truth mel) and 'fake' (generator mel)
         """
+
         return self.loss(input, target)
         
 
@@ -497,6 +498,7 @@ class Regnet(nn.Module):
 
         print("example visual vector shape: ", cen[0].shape)
         print("example mel shape: ", cen[1].shape)
+        print("example label shape: ", cen[-1].shape)
 
         # A is video feature vector, B is mel spec audio
         # Align: video is center, audio is center
@@ -666,8 +668,8 @@ class Regnet(nn.Module):
         # Need to detach to prevent backproping through generator with these fake examples
         pred_fake_center_mis_back = self.netD(self.real_A_cen_mis_back.detach(), self.real_B_cen_mis_back.detach())
         self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
-        print("discriminator output: ", self.pred_fake_center_mis_back)
-        self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, False)
+        print("discriminator output: ", self.pred_fake_center_mis_back.shape)
+        self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, self.cen_mis_back_label)
         print("pairing loss: ", self.loss_D_fake_center_mis_back)
         
 

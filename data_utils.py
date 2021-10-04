@@ -189,8 +189,8 @@ class RegnetLoader(torch.utils.data.Dataset):
         mel_center_end = math.floor(((start_frame+self.reduced_video_samples) / self.video_fps) * one_second)
 
         # Force the mel spectrogram to match mel_samples shape
-        if (mel_center_end - mel_center_start) > self.reduced_mel_samples:
-            mel_center_end = mel_center_end - ((mel_center_end - mel_center_start) - self.reduced_mel_samples)
+        #if (mel_center_end - mel_center_start) > self.reduced_mel_samples:
+        #    mel_center_end = mel_center_end - ((mel_center_end - mel_center_start) - self.reduced_mel_samples)
 
         #print(f"mel start: {mel_center_start} and mel end: {mel_center_end}")
         mel_center = mel[:, mel_center_start:mel_center_end]
