@@ -2,8 +2,9 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 
 class RegnetLogger(SummaryWriter):
-    def __init__(self, logdir):
+    def __init__(self, logdir, exclude_D_r_f=False):
         super(RegnetLogger, self).__init__(logdir)
+        self.exclude_D_r_f = exclude_D_r_f
 
     def log_training(self, model, reduced_loss, learning_rate, duration,
                      iteration):
@@ -16,7 +17,8 @@ class RegnetLogger(SummaryWriter):
         self.add_scalar("training.loss_G_silence", model.loss_G_silence, iteration)
         self.add_scalar("training.loss_D_fake", model.loss_D_fake, iteration)
         self.add_scalar("training.loss_D_real", model.loss_D_real, iteration)
-        self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
+        if not self.exclude_D_r_f:
+            self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
         self.add_scalar("duration", duration, iteration)
 
     def log_testing(self, reduced_loss, epoch):

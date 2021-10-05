@@ -55,46 +55,53 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                     for j in range(len(model.fake_B_cen)):
                         # Center aligned
                         plt.figure(figsize=(8, 9))
-                        plt.subplot(311)
+                        plt.subplot(911)
                         plt.imshow(model.real_B_cen[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"center_ground_truth")
-                        plt.subplot(312)
+                        plt.subplot(912)
                         plt.imshow(model.fake_B_cen[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"center_predict")
-                        plt.subplot(313)
+                        plt.subplot(913)
                         plt.imshow(model.fake_B_cen_postnet[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"center_postnet")
 
                         # Back aligned
-                        plt.subplot(314)
+                        plt.subplot(914)
                         plt.imshow(model.real_B_back[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"back_ground_truth")
-                        plt.subplot(315)
+                        plt.subplot(915)
                         plt.imshow(model.fake_B_back[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"back_predict")
-                        plt.subplot(316)
+                        plt.subplot(916)
                         plt.imshow(model.fake_B_back_postnet[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"back_postnet")
 
                         # Forward aligned
-                        plt.subplot(317)
+                        plt.subplot(917)
                         plt.imshow(model.real_B_for[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"for_ground_truth")
-                        plt.subplot(318)
+                        plt.subplot(918)
                         plt.imshow(model.fake_B_for[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"for_predict")
-                        plt.subplot(319)
+                        plt.subplot(919)
                         plt.imshow(model.fake_B_for_postnet[j].data.cpu().numpy(),
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"for_postnet")
+                        
+                        plt.tight_layout()
+                        viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
+                        os.makedirs(viz_dir, exist_ok=True)
+                        plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
+                        plt.close()
+
                 # Calculate the loss of the three examples
                 loss_cen = criterion((model.fake_B_cen, model.fake_B_cen_postnet), model.real_B_cen)
                 loss_back = criterion((model.fake_B_back, model.fake_B_back_postnet), model.real_B_back)
@@ -118,13 +125,12 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                         plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
                         plt.title(model.video_name[j]+"_postnet")
+                        plt.tight_layout()
+                        viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
+                        os.makedirs(viz_dir, exist_ok=True)
+                        plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
+                        plt.close()
                 loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
-            plt.tight_layout()
-            viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
-            os.makedirs(viz_dir, exist_ok=True)
-            plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
-            plt.close()
-
             #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
@@ -145,7 +151,7 @@ def train(args):
 
     criterion = RegnetLoss(config.loss_type)
 
-    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'))
+    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f)
 
     train_loader, test_loader = prepare_dataloaders(args)
 
@@ -194,11 +200,15 @@ def train(args):
                 loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
 
-            break
             if not math.isnan(reduced_loss):
                 duration = time.perf_counter() - start
-                print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
-                    epoch, i, reduced_loss, model.loss_G, model.loss_D, (model.pred_real - model.pred_fake).mean(), model.loss_G_silence, duration))
+                if config.pairing_loss:
+                    # Remove the discriminator real - fake mean loss
+                    print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                    epoch, i, reduced_loss, model.loss_G, model.loss_D, model.loss_G_silence, duration))
+                else:
+                    print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_G, model.loss_D, (model.pred_real - model.pred_fake).mean(), model.loss_G_silence, duration))
                 logger.log_training(model, reduced_loss, learning_rate, duration, iteration)
 
             iteration += 1

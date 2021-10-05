@@ -36,6 +36,9 @@ _C.extra_upsampling = True
 # Include landmark featuers
 _C.include_landmarks = False
 
+# Logger parameters
+_C.exclude_D_r_f = False
+
 # Encoder parameters
 _C.random_z_dim = 512
 _C.encoder_n_lstm = 2

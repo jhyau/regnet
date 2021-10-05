@@ -104,6 +104,8 @@ class RegnetLoader(torch.utils.data.Dataset):
             
             mel_center_start = math.floor((self.num_misalign_frames / self.video_fps) * (self.mel_samples/self.audio_samples))
             assert(np.array_equal(mel_back[:, mel_center_start:], mel_center[:, :-mel_center_start])) 
+            assert(np.array_equal(mel_center[:, mel_center_start:], mel_for[:, :-mel_center_start]))
+            assert(np.array_equal(mel_back[:, int(2*mel_center_start):], mel_for[:, :-int(2*mel_center_start)]))
 
             # Return a tuple of examples (each a tuple as well)
             return (ex_center, ex_center_mis_back, ex_center_mis_for,
