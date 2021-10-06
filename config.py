@@ -31,13 +31,16 @@ _C.pairing_loss = True
 _C.num_misalign_frames = 10
 _C.reduced_video_samples = 100 # Reduced number of frames to allow misaligning
 _C.reduced_mel_samples = 860
+# Use visual encoder output as input to the second network/discriminator
+_C.visual_encoder_input = False
 # Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
 _C.extra_upsampling = True
 # Include landmark featuers
 _C.include_landmarks = False
 
 # Logger parameters
-_C.exclude_D_r_f = False
+_C.exclude_D_r_f = True
+_C.exclude_gan_loss = True
 
 # Encoder parameters
 _C.random_z_dim = 512

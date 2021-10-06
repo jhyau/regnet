@@ -151,7 +151,7 @@ def train(args):
 
     criterion = RegnetLoss(config.loss_type)
 
-    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f)
+    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f, exclude_gan_loss=config.exclude_gan_loss)
 
     train_loader, test_loader = prepare_dataloaders(args)
 

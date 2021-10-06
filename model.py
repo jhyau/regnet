@@ -282,13 +282,13 @@ class Regnet_G(nn.Module):
         else:
             print(self.mode_input)
         #print(f"Mode input for the generator: {self.mode_input}")
-        encoder_output = self.encoder(inputs * vis_thr)
+        encoder_output_init = self.encoder(inputs * vis_thr)
         gt_auxilitary = self.auxiliary(real_B * spec_thr)
         #print(f'encoder output size: {encoder_output.size()} and gt size: {gt_auxilitary.size()}')
         if self.aux_zero:
             gt_auxilitary = gt_auxilitary * 0
             #print(f"Ground truth spectrogram set to zero: {gt_auxilitary}")
-        encoder_output = torch.cat([encoder_output, gt_auxilitary], dim=2)
+        encoder_output = torch.cat([encoder_output_init, gt_auxilitary], dim=2)
         #print("after concatenation to feed to decoder: ", encoder_output.size())
         mel_output_decoder = self.decoder(encoder_output)
         mel_output_postnet = self.postnet(mel_output_decoder)
@@ -296,16 +296,22 @@ class Regnet_G(nn.Module):
         mel_output = mel_output_decoder + mel_output_postnet
         self.gt_auxilitary = gt_auxilitary
         #print(f'mel output size: {mel_output.shape}, gt_aux shape: {gt_auxilitary.shape}')
-        return mel_output, mel_output_decoder
+        return mel_output, mel_output_decoder, encoder_output_init
 
 
 class Regnet_D(nn.Module):
-    def __init__(self, extra_upsampling):
+    def __init__(self, extra_upsampling, visual_encoder_input):
         super(Regnet_D, self).__init__()
+
+        if not visual_encoder_input:
+            input_size = config.visual_dim
+        else:
+            input_size = int(config.encoder_embedding_dim / 2)
 
         if extra_upsampling:
             self.feature_conv = nn.Sequential(
-                nn.ConvTranspose1d(config.visual_dim, config.decoder_conv_dim,
+                # To pass in the visual encoder output instead of frame features
+                nn.ConvTranspose1d(input_size, config.decoder_conv_dim,
                                    kernel_size=4, stride=2, padding=1),
                 nn.BatchNorm1d(config.decoder_conv_dim),
                 nn.LeakyReLU(0.2, True),
@@ -460,7 +466,7 @@ class Regnet(nn.Module):
         self.model_names = ['G', 'D']
         self.device = torch.device('cuda:0')
         self.netG = init_net(Regnet_G(extra_upsampling), self.device)
-        self.netD = init_net(Regnet_D(extra_upsampling), self.device)
+        self.netD = init_net(Regnet_D(extra_upsampling, visual_encoder_input=config.visual_encoder_input), self.device)
 
         # Set to pairing loss
         if config.pairing_loss:
@@ -558,15 +564,15 @@ class Regnet(nn.Module):
 
 
     def forward(self):
-        self.fake_B, self.fake_B_postnet = self.netG(self.real_A, self.real_B)
+        self.fake_B, self.fake_B_postnet, self.encoder_output = self.netG(self.real_A, self.real_B)
         #print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
 
     def forward_pairing_loss(self):
         # Have the generator predict for the three aligned examples
         #print(f"input sample shape: {self.real_A_cen.shape} and {self.real_B_cen.shape}")
-        self.fake_B_cen, self.fake_B_cen_postnet = self.netG(self.real_A_cen, self.real_B_cen)
-        self.fake_B_back, self.fake_B_back_postnet = self.netG(self.real_A_back, self.real_B_back)
-        self.fake_B_for, self.fake_B_for_postnet = self.netG(self.real_A_for, self.real_B_for)
+        self.fake_B_cen, self.fake_B_cen_postnet, self.fake_cen_encoder_output = self.netG(self.real_A_cen, self.real_B_cen)
+        self.fake_B_back, self.fake_B_back_postnet, self.fake_back_encoder_output = self.netG(self.real_A_back, self.real_B_back)
+        self.fake_B_for, self.fake_B_for_postnet, self.fake_for_encoder_output = self.netG(self.real_A_for, self.real_B_for)
 
         #print(f"Output generated shape: {self.fake_B_cen.shape} and {self.fake_B_cen_postnet.shape}") 
 
@@ -748,20 +754,70 @@ class Regnet(nn.Module):
 
     def backward_G_pairing_loss(self):
         # First, G(A) should fake the discriminator
-        if not self.wo_G_GAN:
-            # TODO: Using the aligned cases, not using generator output for now?
-            # Since the hypothesis is that the generator will generate temporallly aligned audio, use that to fake discriminator
-            pred_real_cen = self.netD(self.real_A_cen, self.fake_B_cen)  #self.netD(self.real_A_cen, self.real_B_cen)
-            self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
+        #if not self.wo_G_GAN:
+        #    # TODO: Using the aligned cases, not using generator output for now?
+        #    # Since the hypothesis is that the generator will generate temporallly aligned audio, use that to fake discriminator
+        #    pred_real_cen = self.netD(self.real_A_cen, self.fake_B_cen)  #self.netD(self.real_A_cen, self.real_B_cen)
+        #    self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
-            pred_real_back = self.netD(self.real_A_back, self.fake_B_back)  #self.netD(self.real_A_back, self.real_B_back)
-            self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
+        #    pred_real_back = self.netD(self.real_A_back, self.fake_B_back)  #self.netD(self.real_A_back, self.real_B_back)
+        #    self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
-            pred_real_for = self.netD(self.real_A_for, self.fake_B_for)  #self.netD(self.real_A_for, self.real_B_for)
-            self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
-            self.loss_G_GAN = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
-        else:
-            self.loss_G_GAN = 0
+        #    pred_real_for = self.netD(self.real_A_for, self.fake_B_for)  #self.netD(self.real_A_for, self.real_B_for)
+        #    self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
+        #    self.loss_G_GAN = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
+        #else:
+        #    self.loss_G_GAN = 0
+
+        # Calculate pairing loss, using encoder output as input
+        pred_fake_center_mis_back = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_back)
+        #self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
+        #print("discriminator output shape: ", self.pred_fake_center_mis_back.shape)
+        #print("Actual output: ", self.pred_fake_center_mis_back)
+        self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, self.cen_mis_back_label)
+        #print("pairing loss: ", self.loss_D_fake_center_mis_back)
+
+        pred_fake_center_mis_for = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_for)
+        #self.pred_fake_center_mis_for = pred_fake_center_mis_for.data.cpu()
+        self.loss_D_fake_center_mis_for = self.criterionGAN(pred_fake_center_mis_for, self.cen_mis_for_label)
+
+        pred_fake_back_mis_cen = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_cen)
+        #self.pred_fake_back_mis_cen = pred_fake_back_mis_cen.data.cpu()
+        self.loss_D_fake_back_mis_cen = self.criterionGAN(pred_fake_back_mis_cen, self.back_mis_cen_label)
+
+        pred_fake_back_mis_for = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_for)
+        #self.pred_fake_back_mis_for = pred_fake_back_mis_for.data.cpu()
+        self.loss_D_fake_back_mis_for = self.criterionGAN(pred_fake_back_mis_for, self.back_mis_for_label)
+
+        pred_fake_for_mis_cen = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_cen)
+        #self.pred_fake_for_mis_cen = pred_fake_for_mis_cen.data.cpu()
+        self.loss_D_fake_for_mis_cen = self.criterionGAN(pred_fake_for_mis_cen, self.for_mis_cen_label)
+
+        pred_fake_for_mis_back = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_back)
+        #self.pred_fake_for_mis_back = pred_fake_for_mis_back.data.cpu()
+        self.loss_D_fake_for_mis_back = self.criterionGAN(pred_fake_for_mis_back, self.for_mis_back_label)
+
+        self.loss_D_fake = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
+                self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back) * (1.0 / 6)
+
+        # Calculate the loss for real/aligned cases
+        pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
+        #self.pred_real_cen = pred_real_cen.data.cpu()
+        self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
+
+        pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
+        #self.pred_real_back = pred_real_back.data.cpu()
+        self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
+
+        pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
+        #self.pred_real_for = pred_real_for.data.cpu()
+        self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
+
+        self.loss_D_real = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
+
+        # Combined temporal misalignment loss, evenly weighted so each is 1/9 weight
+        self.loss_D = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
+                self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back + self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 9)
 
         # Second, G(A) = B, alignment examples
         self.loss_G_L1_cen = self.criterionL1((self.fake_B_cen, self.fake_B_cen_postnet), self.real_B_cen)
@@ -776,7 +832,8 @@ class Regnet(nn.Module):
         self.loss_G_silence = (self.loss_G_silence_cen + self.loss_G_silence_back + self.loss_G_silence_for) * (1.0 / 3)
 
         # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
-        self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
+        # loss_D is the temporal misalignment loss TODO: rename this to something more sensible
+        self.loss_G = self.loss_D + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
 
         self.loss_G.backward()
 
@@ -790,15 +847,15 @@ class Regnet(nn.Module):
             self.forward()
 
         # update D
-        if self.n_iter % self.D_interval == 0:
-            self.set_requires_grad(self.netD, True)
-            self.optimizer_D.zero_grad()
+        #if self.n_iter % self.D_interval == 0:
+        #    self.set_requires_grad(self.netD, True)
+        #    self.optimizer_D.zero_grad()
 
-            if config.pairing_loss:
-                self.backward_D_pairing_loss()
-            else:
-                self.backward_D()
-            self.optimizer_D.step()
+        #    if config.pairing_loss:
+        #        self.backward_D_pairing_loss()
+        #    else:
+        #        self.backward_D()
+        #    self.optimizer_D.step()
 
         # update G
         self.set_requires_grad(self.netD, False)

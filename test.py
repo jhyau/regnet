@@ -120,8 +120,8 @@ def test_model(args, config):
     torch.manual_seed(config.seed)
     torch.cuda.manual_seed(config.seed)
     # add extra_upsampling parameter
-    model = Regnet(extra_upsampling=args.extra_upsampling)
-    valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
+    model = Regnet(extra_upsampling=config.extra_upsampling)
+    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
     test_loader = DataLoader(valset, num_workers=4, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
     if config.checkpoint_path != '':
@@ -135,17 +135,9 @@ def test_model(args, config):
         os.makedirs(config.save_dir, exist_ok=True)
         with open(os.path.join(config.save_dir, 'mel_files.txt'), 'w') as file:
             for i, batch in enumerate(test_loader):
-                #if args.gt:
-                #    input, mel, video_name = batch
-                #    for j in range(len(mel)):
-                    # Use the vocoder to produce sound of the grount truth audio
-                #        mel_spec = mel[j].data
-                #        save_path = os.path.join(config.save_dir, video_name[j]+"_gt.wav")
-                #        if args.vocoder == 'wavenet':
-                #            gen_waveform(wavenet_model, save_path, mel_spec, device, args)
-                #        else:
-                #            gen_waveform_waveglow(args, save_path, mel_spec, device)
-                #    continue 
+                #if config.pairing_loss:
+                #    model.parse_batch_pairing_loss()
+                #    model.forward_pairing_loss()
                 model.parse_batch(batch)
                 model.forward()            
                 for j in range(len(model.fake_B)):
@@ -285,8 +277,8 @@ if __name__ == '__main__':
     parser.add_argument('--num_plots', default=35, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
     parser.add_argument('--gt', action='store_true', help='generate only ground truth audio')
     parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio')
-    parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
-    parser.add_argument('--include_landmarks', action='store_true', help='Include flag to include landmarks in features')
+    #parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
+    #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to include landmarks in features')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
