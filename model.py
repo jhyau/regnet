@@ -512,10 +512,6 @@ class Regnet(nn.Module):
         assert(self.video_name == forward_mis_cen[2])
         assert(self.video_name == back_mis_for[2])
 
-        #print("example visual vector shape: ", cen[0].shape)
-        #print("example mel shape: ", cen[1].shape)
-        #print("example label shape: ", cen[-1].shape)
-
         # A is video feature vector, B is mel spec audio
         # Align: video is center, audio is center
         self.real_A_cen = cen[0].to(self.device).float()
@@ -778,23 +774,18 @@ class Regnet(nn.Module):
         #print("pairing loss: ", self.loss_D_fake_center_mis_back)
 
         pred_fake_center_mis_for = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_for)
-        #self.pred_fake_center_mis_for = pred_fake_center_mis_for.data.cpu()
         self.loss_D_fake_center_mis_for = self.criterionGAN(pred_fake_center_mis_for, self.cen_mis_for_label)
 
         pred_fake_back_mis_cen = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_cen)
-        #self.pred_fake_back_mis_cen = pred_fake_back_mis_cen.data.cpu()
         self.loss_D_fake_back_mis_cen = self.criterionGAN(pred_fake_back_mis_cen, self.back_mis_cen_label)
 
         pred_fake_back_mis_for = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_for)
-        #self.pred_fake_back_mis_for = pred_fake_back_mis_for.data.cpu()
         self.loss_D_fake_back_mis_for = self.criterionGAN(pred_fake_back_mis_for, self.back_mis_for_label)
 
         pred_fake_for_mis_cen = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_cen)
-        #self.pred_fake_for_mis_cen = pred_fake_for_mis_cen.data.cpu()
         self.loss_D_fake_for_mis_cen = self.criterionGAN(pred_fake_for_mis_cen, self.for_mis_cen_label)
 
         pred_fake_for_mis_back = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_back)
-        #self.pred_fake_for_mis_back = pred_fake_for_mis_back.data.cpu()
         self.loss_D_fake_for_mis_back = self.criterionGAN(pred_fake_for_mis_back, self.for_mis_back_label)
 
         self.loss_D_fake = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
@@ -802,15 +793,12 @@ class Regnet(nn.Module):
 
         # Calculate the loss for real/aligned cases
         pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
-        #self.pred_real_cen = pred_real_cen.data.cpu()
         self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
         pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
-        #self.pred_real_back = pred_real_back.data.cpu()
         self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
         pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
-        #self.pred_real_for = pred_real_for.data.cpu()
         self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
 
         self.loss_D_real = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
@@ -833,7 +821,7 @@ class Regnet(nn.Module):
 
         # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
         # loss_D is the temporal misalignment loss TODO: rename this to something more sensible
-        self.loss_G = self.loss_D + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
+        self.loss_G = self.loss_D * self.config.temporal_alignment_lambda + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
 
         self.loss_G.backward()
 

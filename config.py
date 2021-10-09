@@ -22,19 +22,24 @@ _C.flow_feature_dir = "data/features/dog/feature_flow_bninception_dim1024_21.5fp
 _C.mel_dir = "data/features/dog/melspec_10s_22050hz"
 _C.video_samples = 215 # Number of frames in each video. First dim of the feature vectors
 _C.audio_samples = 10  # Number of seconds of audio
-_C.mel_samples = 860
+_C.mel_samples = 1720 # Original mel samples to match 22050 audio sampling rate: 860
 _C.visual_dim = 2048  # Feature vector length. 1024 (rgb) + 1024 (flow) = 2048. becomes 3072 if include landmark feature vector
 _C.n_mel_channels = 80
+
 # Including pairing/misalignment loss
 _C.video_fps = 21.5 # Video fps. Default is 21.5, but for asmr videos, it actually is 30
 _C.pairing_loss = True
-_C.num_misalign_frames = 10
-_C.reduced_video_samples = 100 # Reduced number of frames to allow misaligning
-_C.reduced_mel_samples = 860
+_C.num_misalign_frames = 43
+_C.reduced_video_samples = 108 # Reduced number of frames to allow misaligning
+_C.reduced_mel_samples = 864 # Corresponding reduced time dimension of mel spectrogram
+_C.temporal_alignment_lambda = 1.0 # Weight for temporal loss
+
 # Use visual encoder output as input to the second network/discriminator
-_C.visual_encoder_input = False
+_C.visual_encoder_input = True
+
 # Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
 _C.extra_upsampling = True
+
 # Include landmark featuers
 _C.include_landmarks = False
 
@@ -64,16 +69,16 @@ _C.postnet_embedding_dim = 512
 _C.postnet_kernel_size = 5
 _C.postnet_n_convolutions = 5
 
-_C.loss_type = "MSE"
+_C.loss_type = "MSE" # Reconstruction loss type
 _C.weight_decay = 1e-6
 _C.grad_clip_thresh = 1.0
 _C.batch_size = 64
 _C.lr = 0.0002
 _C.beta1 = 0.5
 _C.continue_train = False
-_C.lambda_Oriloss = 10000.0
+_C.lambda_Oriloss = 1.0 # Original weight: 10000.0
 _C.lambda_Silenceloss = 0
 _C.niter = 100
 _C.D_interval = 1
-_C.wo_G_GAN = False
+_C.wo_G_GAN = False # Flag on whether to use GAN loss or not
 _C.wavenet_path = ""
