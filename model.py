@@ -676,49 +676,50 @@ class Regnet(nn.Module):
 
     def backward_D_pairing_loss(self):
         """Discriminator backprop using pairing loss"""
+        # Using visual encoder output as input
         # Use all 9 examples, starting with the 6 misaligned "fake" examples
         # Need to detach to prevent backproping through generator with these fake examples
-        pred_fake_center_mis_back = self.netD(self.real_A_cen_mis_back.detach(), self.real_B_cen_mis_back.detach())
-        self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
+        pred_fake_center_mis_back = self.netD(self.fake_cen_encoder_output.detach(), self.real_B_cen_mis_back.detach())
+        #self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
         #print("discriminator output shape: ", self.pred_fake_center_mis_back.shape)
         #print("Actual output: ", self.pred_fake_center_mis_back)
         self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, self.cen_mis_back_label)
         #print("pairing loss: ", self.loss_D_fake_center_mis_back)
        
-        pred_fake_center_mis_for = self.netD(self.real_A_cen_mis_for.detach(), self.real_B_cen_mis_for.detach())
-        self.pred_fake_center_mis_for = pred_fake_center_mis_for.data.cpu()
+        pred_fake_center_mis_for = self.netD(self.fake_cen_encoder_output.detach(), self.real_B_cen_mis_for.detach())
+        #self.pred_fake_center_mis_for = pred_fake_center_mis_for.data.cpu()
         self.loss_D_fake_center_mis_for = self.criterionGAN(pred_fake_center_mis_for, self.cen_mis_for_label)
 
-        pred_fake_back_mis_cen = self.netD(self.real_A_back_mis_cen, self.real_B_back_mis_cen)
-        self.pred_fake_back_mis_cen = pred_fake_back_mis_cen.data.cpu()
+        pred_fake_back_mis_cen = self.netD(self.fake_back_encoder_output.detach(), self.real_B_back_mis_cen.detach())
+        #self.pred_fake_back_mis_cen = pred_fake_back_mis_cen.data.cpu()
         self.loss_D_fake_back_mis_cen = self.criterionGAN(pred_fake_back_mis_cen, self.back_mis_cen_label)
 
-        pred_fake_back_mis_for = self.netD(self.real_A_back_mis_for, self.real_B_back_mis_for)
-        self.pred_fake_back_mis_for = pred_fake_back_mis_for.data.cpu()
+        pred_fake_back_mis_for = self.netD(self.fake_back_encoder_output.detach(), self.real_B_back_mis_for.detach())
+        #self.pred_fake_back_mis_for = pred_fake_back_mis_for.data.cpu()
         self.loss_D_fake_back_mis_for = self.criterionGAN(pred_fake_back_mis_for, self.back_mis_for_label)
 
-        pred_fake_for_mis_cen = self.netD(self.real_A_for_mis_cen, self.real_B_for_mis_cen)
-        self.pred_fake_for_mis_cen = pred_fake_for_mis_cen.data.cpu()
+        pred_fake_for_mis_cen = self.netD(self.fake_for_encoder_output.detach(), self.real_B_for_mis_cen.detach())
+        #self.pred_fake_for_mis_cen = pred_fake_for_mis_cen.data.cpu()
         self.loss_D_fake_for_mis_cen = self.criterionGAN(pred_fake_for_mis_cen, self.for_mis_cen_label)
 
-        pred_fake_for_mis_back = self.netD(self.real_A_for_mis_back, self.real_B_for_mis_back)
-        self.pred_fake_for_mis_back = pred_fake_for_mis_back.data.cpu()
+        pred_fake_for_mis_back = self.netD(self.fake_for_encoder_output.detach(), self.real_B_for_mis_back.detach())
+        #self.pred_fake_for_mis_back = pred_fake_for_mis_back.data.cpu()
         self.loss_D_fake_for_mis_back = self.criterionGAN(pred_fake_for_mis_back, self.for_mis_back_label)
 
         self.loss_D_fake = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
                 self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back) * (1.0 / 6)
 
         # Calculate the loss for real/aligned cases
-        pred_real_cen = self.netD(self.real_A_cen, self.real_B_cen)
-        self.pred_real_cen = pred_real_cen.data.cpu()
+        pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
+        #self.pred_real_cen = pred_real_cen.data.cpu()
         self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
-        pred_real_back = self.netD(self.real_A_back, self.real_B_back)
-        self.pred_real_back = pred_real_back.data.cpu()
+        pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
+        #self.pred_real_back = pred_real_back.data.cpu()
         self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
-        pred_real_for = self.netD(self.real_A_for, self.real_B_for)
-        self.pred_real_for = pred_real_for.data.cpu()
+        pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
+        #self.pred_real_for = pred_real_for.data.cpu()
         self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
 
         self.loss_D_real = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
@@ -750,62 +751,60 @@ class Regnet(nn.Module):
 
     def backward_G_pairing_loss(self):
         # First, G(A) should fake the discriminator
-        #if not self.wo_G_GAN:
-        #    # TODO: Using the aligned cases, not using generator output for now?
+        if not self.wo_G_GAN:
         #    # Since the hypothesis is that the generator will generate temporallly aligned audio, use that to fake discriminator
-        #    pred_real_cen = self.netD(self.real_A_cen, self.fake_B_cen)  #self.netD(self.real_A_cen, self.real_B_cen)
-        #    self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
+            pred_real_cen = self.netD(self.fake_cen_encoder_output, self.fake_B_cen)  #self.netD(self.real_A_cen, self.real_B_cen)
+            self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
-        #    pred_real_back = self.netD(self.real_A_back, self.fake_B_back)  #self.netD(self.real_A_back, self.real_B_back)
-        #    self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
+            pred_real_back = self.netD(self.fake_back_encoder_output, self.fake_B_back)  #self.netD(self.real_A_back, self.real_B_back)
+            self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
-        #    pred_real_for = self.netD(self.real_A_for, self.fake_B_for)  #self.netD(self.real_A_for, self.real_B_for)
-        #    self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
-        #    self.loss_G_GAN = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
-        #else:
+            pred_real_for = self.netD(self.fake_for_encoder_output, self.fake_B_for)  #self.netD(self.real_A_for, self.real_B_for)
+            self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
+            #self.loss_G_GAN = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
+            self.loss_temporal = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
+        else:
         #    self.loss_G_GAN = 0
+            # Calculate pairing loss, using encoder output as input
+            pred_fake_center_mis_back = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_back)
+            #print("discriminator output shape: ", self.pred_fake_center_mis_back.shape)
+            #print("Actual output: ", self.pred_fake_center_mis_back)
+            self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, self.cen_mis_back_label)
+            #print("pairing loss: ", self.loss_D_fake_center_mis_back)
 
-        # Calculate pairing loss, using encoder output as input
-        pred_fake_center_mis_back = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_back)
-        #self.pred_fake_center_mis_back = pred_fake_center_mis_back.data.cpu()
-        #print("discriminator output shape: ", self.pred_fake_center_mis_back.shape)
-        #print("Actual output: ", self.pred_fake_center_mis_back)
-        self.loss_D_fake_center_mis_back = self.criterionGAN(pred_fake_center_mis_back, self.cen_mis_back_label)
-        #print("pairing loss: ", self.loss_D_fake_center_mis_back)
+            pred_fake_center_mis_for = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_for)
+            self.loss_D_fake_center_mis_for = self.criterionGAN(pred_fake_center_mis_for, self.cen_mis_for_label)
 
-        pred_fake_center_mis_for = self.netD(self.fake_cen_encoder_output, self.real_B_cen_mis_for)
-        self.loss_D_fake_center_mis_for = self.criterionGAN(pred_fake_center_mis_for, self.cen_mis_for_label)
+            pred_fake_back_mis_cen = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_cen)
+            self.loss_D_fake_back_mis_cen = self.criterionGAN(pred_fake_back_mis_cen, self.back_mis_cen_label)
 
-        pred_fake_back_mis_cen = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_cen)
-        self.loss_D_fake_back_mis_cen = self.criterionGAN(pred_fake_back_mis_cen, self.back_mis_cen_label)
+            pred_fake_back_mis_for = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_for)
+            self.loss_D_fake_back_mis_for = self.criterionGAN(pred_fake_back_mis_for, self.back_mis_for_label)
 
-        pred_fake_back_mis_for = self.netD(self.fake_back_encoder_output, self.real_B_back_mis_for)
-        self.loss_D_fake_back_mis_for = self.criterionGAN(pred_fake_back_mis_for, self.back_mis_for_label)
+            pred_fake_for_mis_cen = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_cen)
+            self.loss_D_fake_for_mis_cen = self.criterionGAN(pred_fake_for_mis_cen, self.for_mis_cen_label)
 
-        pred_fake_for_mis_cen = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_cen)
-        self.loss_D_fake_for_mis_cen = self.criterionGAN(pred_fake_for_mis_cen, self.for_mis_cen_label)
+            pred_fake_for_mis_back = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_back)
+            self.loss_D_fake_for_mis_back = self.criterionGAN(pred_fake_for_mis_back, self.for_mis_back_label)
 
-        pred_fake_for_mis_back = self.netD(self.fake_for_encoder_output, self.real_B_for_mis_back)
-        self.loss_D_fake_for_mis_back = self.criterionGAN(pred_fake_for_mis_back, self.for_mis_back_label)
+            self.loss_D_fake = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
+                    self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back) * (1.0 / 6)
 
-        self.loss_D_fake = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
-                self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back) * (1.0 / 6)
+            # Calculate the loss for real/aligned cases
+            pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
+            self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
-        # Calculate the loss for real/aligned cases
-        pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
-        self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
+            pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
+            self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
-        pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
-        self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
+            pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
+            self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
 
-        pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
-        self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
+            self.loss_D_real = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
 
-        self.loss_D_real = (self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 3)
-
-        # Combined temporal misalignment loss, evenly weighted so each is 1/9 weight
-        self.loss_D = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
-                self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back + self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 9)
+            # Combined temporal misalignment loss, evenly weighted so each is 1/9 weight
+            self.loss_temporal = (self.loss_D_fake_center_mis_back + self.loss_D_fake_center_mis_for + self.loss_D_fake_back_mis_cen + self.loss_D_fake_back_mis_for +
+                    self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back + self.loss_D_real_cen + self.loss_D_real_back + self.loss_D_real_for) * (1.0 / 9)
 
         # Second, G(A) = B, alignment examples
         self.loss_G_L1_cen = self.criterionL1((self.fake_B_cen, self.fake_B_cen_postnet), self.real_B_cen)
@@ -820,8 +819,8 @@ class Regnet(nn.Module):
         self.loss_G_silence = (self.loss_G_silence_cen + self.loss_G_silence_back + self.loss_G_silence_for) * (1.0 / 3)
 
         # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
-        # loss_D is the temporal misalignment loss TODO: rename this to something more sensible
-        self.loss_G = self.loss_D * self.config.temporal_alignment_lambda + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
+        # loss_temporal is the temporal misalignment loss
+        self.loss_G = self.loss_temporal * self.config.temporal_alignment_lambda + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
 
         self.loss_G.backward()
 
@@ -835,15 +834,17 @@ class Regnet(nn.Module):
             self.forward()
 
         # update D
-        #if self.n_iter % self.D_interval == 0:
-        #    self.set_requires_grad(self.netD, True)
-        #    self.optimizer_D.zero_grad()
+        if not self.wo_G_GAN:
+            print("Backpropping through discriminator...")
+            if self.n_iter % self.D_interval == 0:
+                self.set_requires_grad(self.netD, True)
+                self.optimizer_D.zero_grad()
 
-        #    if config.pairing_loss:
-        #        self.backward_D_pairing_loss()
-        #    else:
-        #        self.backward_D()
-        #    self.optimizer_D.step()
+                if config.pairing_loss:
+                    self.backward_D_pairing_loss()
+                else:
+                    self.backward_D()
+                self.optimizer_D.step()
 
         # update G
         self.set_requires_grad(self.netD, False)

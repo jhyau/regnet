@@ -80,5 +80,5 @@ _C.lambda_Oriloss = 1.0 # Original weight: 10000.0
 _C.lambda_Silenceloss = 0
 _C.niter = 100
 _C.D_interval = 1
-_C.wo_G_GAN = False # Flag on whether to use GAN loss or not
+_C.wo_G_GAN = True # Flag on whether to use GAN loss(or GAN setup in our case) or not
 _C.wavenet_path = ""

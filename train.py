@@ -204,8 +204,12 @@ def train(args):
                 duration = time.perf_counter() - start
                 if config.pairing_loss:
                     # Remove the discriminator real - fake mean loss
-                    print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
-                    epoch, i, reduced_loss, model.loss_G, model.loss_D, model.loss_G_silence, duration))
+                    if not config.wo_GAN:
+                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} temporal:{:.6f} D:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_G, model.loss_temporal, model.loss_D, model.loss_G_silence, duration))
+                    else:
+                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} temporal:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_G, model.loss_temporal, model.loss_G_silence, duration))
                 else:
                     print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
                         epoch, i, reduced_loss, model.loss_G, model.loss_D, (model.pred_real - model.pred_fake).mean(), model.loss_G_silence, duration))
