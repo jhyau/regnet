@@ -710,15 +710,15 @@ class Regnet(nn.Module):
                 self.loss_D_fake_for_mis_cen + self.loss_D_fake_for_mis_back) * (1.0 / 6)
 
         # Calculate the loss for real/aligned cases
-        pred_real_cen = self.netD(self.fake_cen_encoder_output, self.real_B_cen)
+        pred_real_cen = self.netD(self.fake_cen_encoder_output.detach(), self.real_B_cen)
         #self.pred_real_cen = pred_real_cen.data.cpu()
         self.loss_D_real_cen = self.criterionGAN(pred_real_cen, self.cen_label)
 
-        pred_real_back = self.netD(self.fake_back_encoder_output, self.real_B_back)
+        pred_real_back = self.netD(self.fake_back_encoder_output.detach(), self.real_B_back)
         #self.pred_real_back = pred_real_back.data.cpu()
         self.loss_D_real_back = self.criterionGAN(pred_real_back, self.back_label)
 
-        pred_real_for = self.netD(self.fake_for_encoder_output, self.real_B_for)
+        pred_real_for = self.netD(self.fake_for_encoder_output.detach(), self.real_B_for)
         #self.pred_real_for = pred_real_for.data.cpu()
         self.loss_D_real_for = self.criterionGAN(pred_real_for, self.for_label)
 
