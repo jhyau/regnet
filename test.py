@@ -67,7 +67,8 @@ def gen_waveform(model, save_path, c, device, args):
             initial_input, c=c, g=None, T=length, tqdm=tqdm, softmax=True, quantize=True,
             log_scale_min=np.log(1e-14))
     waveform = y_hat.view(-1).cpu().data.numpy()
-    librosa.output.write_wav(save_path, waveform, sr=args.sampling_rate) # default sr=22050
+    #librosa.output.write_wav(save_path, waveform, sr=args.sampling_rate) # default sr=22050
+    write(save_path, args.sampling_rate, waveform)
 
 def gen_waveform_waveglow(args, save_path, c, device):
     # Set up the waveglow config
