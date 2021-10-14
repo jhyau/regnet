@@ -10,9 +10,8 @@ numpy
 scipy
 sklearn
 tensorboard
-mediapipe
+mediapipe # for skeletal hand landmarks
 jupyter
 #ddsp # Use the submodule version instead, with pip install -e .
 tensorflow-io
 #wandb # for training if wanted
-#google-colab
