@@ -102,6 +102,13 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                         plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
                         plt.close()
 
+                        # Save the three generated audio samples batches
+                        eval_dir = os.path.join(config.save_dir, "mel_spec_eval", f'epoch_{epoch:05d}')
+                        os.makedirs(eval_dir, exist_ok=True)
+                        np.save(os.path.join(eval_dir, model.video_name[j]+"_center.npy"), model.fake_B_cen[j].data.cpu().numpy())
+                        np.save(os.path.join(eval_dir, model.video_name[j]+"_forward.npy"), model.fake_B_for[j].data.cpu().numpy())
+                        np.save(os.path.join(eval_dir, model.video_name[j]+"_back.npy"), model.fake_B_back[j].data.cpu().numpy())
+
                 # Calculate the loss of the three examples
                 loss_cen = criterion((model.fake_B_cen, model.fake_B_cen_postnet), model.real_B_cen)
                 loss_back = criterion((model.fake_B_back, model.fake_B_back_postnet), model.real_B_back)
@@ -130,6 +137,11 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                         os.makedirs(viz_dir, exist_ok=True)
                         plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
                         plt.close()
+
+                        # Save the eval generated audio mel specs
+                        eval_dir = os.path.join(config.save_dir, "mel_spec_eval", f'epoch_{epoch:05d}')
+                        os.makedirs(eval_dir, exist_ok=True)
+                        np.save(os.path.join(eval_dir, model.video_name[j]+".npy"), model.fake_B[j].data.cpu().numpy())
                 loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
