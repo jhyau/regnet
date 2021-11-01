@@ -13,6 +13,7 @@ class RegnetLogger(SummaryWriter):
         self.add_scalar("learning.rate", learning_rate, iteration)
         self.add_scalar("training.loss_G", model.loss_G, iteration)
         self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
+        self.add_scalar("training.peaks_delta", model.peaks_delta, iteration)
 
         #if not self.exclude_gan_loss:
         #    self.add_scalar("training.loss_G_GAN", model.loss_G_GAN, iteration)

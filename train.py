@@ -21,12 +21,17 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+import util.peak_counter as pc
+
 def prepare_dataloaders(args):
     # Get data, data loaders and collate function ready
     #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
-    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
-    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss,
+                            randomize_samples=config.randomize_subset_samples)
+    # For comparison across randomization, the val set should not randomize where it makes the cuts.
+    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss,
+                          randomize_samples=False)
 
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
     train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
@@ -41,6 +46,14 @@ def prepare_dataloaders(args):
     return train_loader, test_loader
 
 
+def visualize(_plt, mel, plotid, tag):
+    _plt.subplot(911+plotid)
+    _plt.imshow(mel, aspect='auto', origin='lower')
+    h,w = mel.shape
+    #mel_peaks = pc.get_im_overlay(pc.count_peaks(mel)[1], w, h)
+    #_plt.imshow(mel, aspect='auto', origin='lower', cmap='Reds')
+    _plt.title(tag)
+
 def test_model(model, criterion, test_loader, epoch, logger, visualization=False):
     model.eval()
     reduced_loss_ = []
@@ -54,47 +67,26 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                 if visualization:
                     for j in range(len(model.fake_B_cen)):
                         # Center aligned
+                        vname = model.video_name[j]
                         plt.figure(figsize=(8, 9))
-                        plt.subplot(911)
-                        plt.imshow(model.real_B_cen[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"center_ground_truth")
-                        plt.subplot(912)
-                        plt.imshow(model.fake_B_cen[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"center_predict")
-                        plt.subplot(913)
-                        plt.imshow(model.fake_B_cen_postnet[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"center_postnet")
-
-                        # Back aligned
-                        plt.subplot(914)
-                        plt.imshow(model.real_B_back[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"back_ground_truth")
-                        plt.subplot(915)
-                        plt.imshow(model.fake_B_back[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"back_predict")
-                        plt.subplot(916)
-                        plt.imshow(model.fake_B_back_postnet[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"back_postnet")
-
-                        # Forward aligned
-                        plt.subplot(917)
-                        plt.imshow(model.real_B_for[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"for_ground_truth")
-                        plt.subplot(918)
-                        plt.imshow(model.fake_B_for[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"for_predict")
-                        plt.subplot(919)
-                        plt.imshow(model.fake_B_for_postnet[j].data.cpu().numpy(),
-                                    aspect='auto', origin='lower')
-                        plt.title(model.video_name[j]+"for_postnet")
+                        mel = model.real_B_cen[j].data.cpu().numpy()
+                        visualize(plt, mel, 0, vname+"center_ground_truth")
+                        mel = model.fake_B_cen[j].data.cpu().numpy()
+                        visualize(plt, mel, 1, vname+"center_predict")
+                        mel = model.fake_B_cen_postnet[j].data.cpu().numpy()
+                        visualize(plt, mel, 2, vname+"center_postnet")
+                        mel = model.real_B_back[j].data.cpu().numpy()
+                        visualize(plt, mel, 3, vname+"back_ground_truth")
+                        mel = model.fake_B_back[j].data.cpu().numpy()
+                        visualize(plt, mel, 4, vname+"back_predict")
+                        mel = model.fake_B_back_postnet[j].data.cpu().numpy()
+                        visualize(plt, mel, 5, vname+"back_postnet")
+                        mel = model.real_B_for[j].data.cpu().numpy()
+                        visualize(plt, mel, 6, vname+"for_ground_truth")
+                        mel = model.fake_B_for[j].data.cpu().numpy()
+                        visualize(plt, mel, 7, vname+"for_predict")
+                        mel = model.fake_B_for_postnet[j].data.cpu().numpy()
+                        visualize(plt, mel, 8, vname+"for_postnet")
                         
                         plt.tight_layout()
                         viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')

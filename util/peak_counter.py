@@ -1,5 +1,11 @@
 import numpy as np
 
+def get_im_overlay(indexes, width, height):
+    """TODO"""
+    im = np.zeros((height, width))
+    im[:,indexes] = 1.
+    return im
+
 def count_peaks(spectogram, window_size=3, floor=30., delta=0.):
     """Count the peaks and their start point in |spectogram|.
 
@@ -16,7 +22,7 @@ def count_peaks(spectogram, window_size=3, floor=30., delta=0.):
     total_intensities = np.sum(np.exp(spectogram - np.min(spectogram)), axis=0)
     # total_intensities = np.sum(spectogram, axis=0)
     # try out percentage based flooring
-    floor = np.max(total_intensities) * 0.50
+    floor = np.max(total_intensities) * 0.02
     # Floor out the poor ones.
     # total_intensities[total_intensities < floor] = 0.
     # Let's make an array of whether a[i] > a[i-1]

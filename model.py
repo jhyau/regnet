@@ -1,6 +1,10 @@
 import glob
 import math
 import os
+
+import numpy as np
+import util.peak_counter as pc
+
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -504,13 +508,15 @@ class Regnet(nn.Module):
     def parse_batch_pairing_loss(self, batch):
         """Use this function to parse in the batch of examples based on pairing loss"""
         # There are 9 different sets of examples for pairing loss: 6 misaligned, 3 aligned
-        cen, cen_mis_back, cen_mis_for, back, back_mis_cen, back_mis_for, forward, forward_mis_cen, forward_mis_back = batch
+        # cen, cen_mis_back, cen_mis_for, back, back_mis_cen, back_mis_for, forward, forward_mis_cen, forward_mis_back = batch
+        # see data_utils.py for the named tuple implemenation that each batch
+        # entry is.
 
+        cen, cen_mis_back, cen_mis_for, back, back_mis_cen, back_mis_for, forward, forward_mis_cen, forward_mis_back = batch
         # Set all the input video features and audio for the model
-        self.video_name = cen[2]
-        assert(self.video_name == back[2])
-        assert(self.video_name == forward_mis_cen[2])
-        assert(self.video_name == back_mis_for[2])
+        self.video_name = batch[0].video_id
+        # Ensure all labels match.
+        assert all([e.video_id == self.video_name for e in batch])
 
         # A is video feature vector, B is mel spec audio
         # Align: video is center, audio is center
@@ -570,6 +576,19 @@ class Regnet(nn.Module):
         self.fake_B_back, self.fake_B_back_postnet, self.fake_back_encoder_output = self.netG(self.real_A_back, self.real_B_back)
         self.fake_B_for, self.fake_B_for_postnet, self.fake_for_encoder_output = self.netG(self.real_A_for, self.real_B_for)
 
+        # computere here, on average, how many peaks are in |self.fake_B_cen| vs
+        # in self.real_B_cen and compare.
+        pred_mels = np.vstack([self.fake_B_cen.detach().cpu().numpy(),
+                               self.fake_B_back.detach().cpu().numpy(),
+                               self.fake_B_for.detach().cpu().numpy()])
+        mels = np.vstack([self.real_B_cen.detach().cpu().numpy(),
+                          self.real_B_back.detach().cpu().numpy(),
+                          self.real_B_for.detach().cpu().numpy()])
+        pred_peaks = np.array([pc.count_peaks(p)[0] for p in pred_mels])
+        peaks = np.array([pc.count_peaks(p)[0] for p in mels])
+        self.peaks_delta = np.abs(np.mean(pred_peaks-peaks))
+        # print('On average there was a %f peak discrepancy between pred and gt' %
+        #        self.peaks_delta)
         #print(f"Output generated shape: {self.fake_B_cen.shape} and {self.fake_B_cen_postnet.shape}") 
 
     def get_scheduler(self, optimizer, config):

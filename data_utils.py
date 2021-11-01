@@ -1,3 +1,4 @@
+import collections
 import os
 import pickle
 import random
@@ -7,22 +8,36 @@ import torch
 import torch.utils.data
 from config import _C as config
 
+import aligner
+
+# named tuple to make code more portable.
+PairingLossPoint = collections.namedtuple('PairingLossPoint', ['feature', 'mel', 'video_id', 'label'])
 
 class RegnetLoader(torch.utils.data.Dataset):
     """
     loads image, flow feature, mel-spectrogramsfiles
     """
 
-    def __init__(self, list_file, max_sample=-1, include_landmarks=True, pairing_loss=True):
+    def __init__(self, list_file, max_sample=-1, include_landmarks=True, pairing_loss=True,
+                 randomize_samples=True):
         self.video_samples = config.video_samples
         self.audio_samples = config.audio_samples
         self.mel_samples = config.mel_samples
         self.include_landmarks = include_landmarks
+        self.randomize_samples = randomize_samples
         self.pairing_loss = pairing_loss
         self.num_misalign_frames = config.num_misalign_frames
+        self.temporal_misalign_pos_samples = config.temporal_misalign_pos_samples
+        self.temporal_misalign_neg_samples_per_pos = config.temporal_misalign_neg_samples_per_pos
+        self.allow_temporal_misalign_overlap = config.allow_temporal_misalign_overlap
         self.reduced_video_samples = config.reduced_video_samples
         self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
+        # This list is used when generating *non* randomized samples as a substitute
+        # for aligner.
+        self._non_rand_sample_idx = [(0, self.num_misalign_frames),
+                                     (self.num_misalign_frames, 2*self.num_misalign_frames),
+                                     (2*self.num_misalign_frames, 0)]
 
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
@@ -35,82 +50,37 @@ class RegnetLoader(torch.utils.data.Dataset):
         im = self.get_im(im_path)
         flow = self.get_flow(flow_path)
         mel = self.get_mel(mel_path)
+        output = []
 
         if self.pairing_loss:
-            # Shift forward and backward by num_misalign_frames
-            # Note that the video_samples should be < 216 (or whatever is max num frames of the loaded feature vectors) to allow for shifting
-            im_center = self.get_feature_subset(im, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
-            #im_center = im[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
-            #flow_center = flow[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
-            flow_center = self.get_feature_subset(flow, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
 
-            # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
-            # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
-            #mel_center_start = int(self.num_misalign_frames / self.video_fps)
-            #mel_center_end = int((self.num_misalign_frames+self.reduced_video_samples) / self.video_fps)
-            #mel_center = mel[:, mel_center_start:mel_center_end]
-            mel_center = self.get_mel_subset(mel, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
+            window_size = self.reduced_video_samples
+            num_frames, _ = im.shape
+            misaligned = self.temporal_misalign_neg_samples_per_pos
+            for i in range(self.temporal_misalign_pos_samples):
+                if self.randomize_samples:
+                    start_idx, mis_idx = aligner.get_misaligned_starts(num_frames, window_size, misaligned)
+                else:
+                    start_idx, mis_idx = self._non_rand_sample_idx[i]
 
-            # Calculate the backward and forward shifts
-            im_back = self.get_feature_subset(im, 0, self.reduced_video_samples)
-            flow_back = self.get_feature_subset(flow, 0, self.reduced_video_samples)
-            mel_back = self.get_mel_subset(mel, 0, self.reduced_video_samples)
+                im_sub = self.get_feature_subset(im, start_idx, start_idx+window_size)
+                flow_sub = self.get_feature_subset(flow, start_idx, start_idx+window_size)
+                mel_sub = self.get_mel_subset(mel, start_idx, start_idx+window_size)
+                
+                im_mis = self.get_feature_subset(im, mis_idx, mis_idx+window_size)
+                flow_mis = self.get_feature_subset(flow, mis_idx, mis_idx+window_size)
+                mel_mis = self.get_mel_subset(mel, mis_idx, mis_idx+window_size)
 
-            im_for = self.get_feature_subset(im, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
-            flow_for = self.get_feature_subset(flow, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
-            mel_for = self.get_mel_subset(mel, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
+                feat_sub = torch.FloatTensor(np.concatenate((im_sub, flow_sub), 1).astype(np.float32))
+                feat_mis = torch.FloatTensor(np.concatenate((im_mis, flow_mis), 1).astype(np.float32))
 
-            if self.include_landmarks:
-                assert(config.landmark_feature_dir is not None)
-                land_path = os.path.join(config.landmark_feature_dir, video_id+".pkl")
+                output.append(PairingLossPoint(feat_sub, mel_sub, video_id, 1))
+                output.append(PairingLossPoint(feat_mis, mel_sub, video_id, 0))
+                output.append(PairingLossPoint(feat_sub, mel_mis, video_id, 0))
 
-                # Landmark features are same dims as RGB feature
-                land = self.get_land(land_path)
-                #land_center = land[self.num_misalign_frames:(self.num_misalign_frames+self.reduced_video_samples), :]
-                land_center = self.get_feature_subset(land, self.num_misalign_frames, self.num_misalign_frames+self.reduced_video_samples)
-                land_back = self.get_feature_subset(land, 0, self.reduced_video_samples)
-                land_for = self.get_feature_subset(land, 2*self.num_misalign_frames, 2*self.num_misalign_frames+self.reduced_video_samples)
-
-                # Create the examples to be loaded by the model
-                feature_center = np.concatenate((im_center, flow_center, land_center), 1)
-                feature_back = np.concatenate((im_back, flow_back, land_back), 1)
-                feature_for = np.concatenate((im_for, flow_for, land_for), 1)
-            else:
-                feature_center = np.concatenate((im_center, flow_center), 1)
-                feature_back = np.concatenate((im_back, flow_back), 1)
-                feature_for = np.concatenate((im_for, flow_for), 1)
-
-            feature_center = torch.FloatTensor(feature_center.astype(np.float32))
-            feature_back = torch.FloatTensor(feature_back.astype(np.float32))
-            feature_for = torch.FloatTensor(feature_for.astype(np.float32))
-
-            # Return the examples for pairing loss
-            # Center example (include label: 1 if aligned, 0 if misaligned)
-            ex_center = (feature_center, mel_center, video_id, 1)
-            ex_center_mis_back = (feature_center, mel_back, video_id, 0)
-            ex_center_mis_for = (feature_center, mel_for, video_id, 0)
-
-            # Backward examples
-            ex_back = (feature_back, mel_back, video_id, 1)
-            ex_back_mis_cen = (feature_back, mel_center, video_id, 0)
-            ex_back_mis_for = (feature_back, mel_for, video_id, 0)
-
-            # Forward examples
-            ex_for = (feature_for, mel_for, video_id, 1)
-            ex_for_mis_cen = (feature_for, mel_center, video_id, 0)
-            ex_for_mis_back = (feature_for, mel_back, video_id, 0)
-
-            assert(np.array_equal(feature_back[self.num_misalign_frames:, :], feature_center[:-self.num_misalign_frames, :]))
-            
-            mel_center_start = math.floor((self.num_misalign_frames / self.video_fps) * (self.mel_samples/self.audio_samples))
-            assert(np.array_equal(mel_back[:, mel_center_start:], mel_center[:, :-mel_center_start])) 
-            assert(np.array_equal(mel_center[:, mel_center_start:], mel_for[:, :-mel_center_start]))
-            assert(np.array_equal(mel_back[:, int(2*mel_center_start):], mel_for[:, :-int(2*mel_center_start)]))
-
-            # Return a tuple of examples (each a tuple as well)
-            return (ex_center, ex_center_mis_back, ex_center_mis_for,
-                    ex_back, ex_back_mis_cen, ex_back_mis_for,
-                    ex_for, ex_for_mis_cen, ex_for_mis_back)
+        # Return a tuple of examples (each a tuple as well)
+        
+        return tuple(output)
     
 
         if self.include_landmarks:
@@ -187,8 +157,8 @@ class RegnetLoader(torch.utils.data.Dataset):
         # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
         # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
         one_second = self.mel_samples / self.audio_samples
-        mel_center_start = math.floor((start_frame / self.video_fps) * one_second)
-        mel_center_end = math.floor(((start_frame+self.reduced_video_samples) / self.video_fps) * one_second)
+        mel_center_start = int(round((start_frame / self.video_fps) * one_second))
+        mel_center_end = int(round(((start_frame+self.reduced_video_samples) / self.video_fps) * one_second))
 
         # Force the mel spectrogram to match mel_samples shape
         #if (mel_center_end - mel_center_start) > self.reduced_mel_samples:
