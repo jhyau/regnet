@@ -66,6 +66,9 @@ _C.encoder_embedding_dim = 2048
 _C.encoder_kernel_size = 5
 _C.encoder_n_convolutions = 3
 
+# Modal impulse prediction parameters
+_C.n_modal_frequencies = 256
+
 # Auxiliary parameters
 _C.auxiliary_type = "lstm_last"
 _C.auxiliary_dim = 256

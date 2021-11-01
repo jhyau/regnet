@@ -42,7 +42,7 @@ if args.job_type == 'bulk':
 elif args.job_type == 'single':
     if args.save_title is None:
         name = args.audio_path.split('/')[-1].split('.')[0]
-        args.save_title = name+'.mp4'
+        args.save_title = name
     new_vid_name = os.path.join(args.output_path, args.save_title)
     print('Saving new video: ', new_vid_name)
     os.system(f"ffmpeg -i {args.vid_path} -i {args.audio_path} -c:v copy -map 0:v:0 -map 1:a:0 {new_vid_name}.mp4")

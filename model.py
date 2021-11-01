@@ -203,6 +203,24 @@ class Auxiliary_conv(nn.Module):
         return x
 
 
+class ModalImpulseDecoder(nn.Module):
+    """
+    Takes the visual encoder output and predicts the vectors needed to generate modal impulse:
+    - gains
+    - frequencies
+    - dampings
+    """
+    def __init__(self, input_dim, output_dim):
+        super(ModalImpulseDecoder, self).__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+        self.relu = torch.nn.ReLU() # instead of Heaviside step fn
+
+    def forward(self, x):
+        fc_output = self.fc(x)
+        output = self.relu(fc_output) # instead of Heaviside step fn
+        return output
+
+
 class Decoder(nn.Module):
     def __init__(self, extra_upsampling):
         super(Decoder, self).__init__()
