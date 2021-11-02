@@ -87,7 +87,7 @@ def get_TSN_Data_set(args):
             num_workers=1, pin_memory=True)
 
 
-class TSNDataSet(Dataset):
+class TSNDataSet(torch.utils.data.Dataset):
     def __init__(self, root_path, list_file, modality='RGB',
                  image_tmpl='img_{:05d}.jpg', transform=None):
 
@@ -131,9 +131,8 @@ class TSNDataSet(Dataset):
         # Get flow images
         self.modality == 'Flow'
         self.image_tmpl = args.flow_prefix+"flow_{}_{:05d}.jpg"
-        for in in (np.arange(num_frames_flow)+1):
+        for ind in (np.arange(num_frames_flow)+1):
             images_flow.extend(self._load_image(video_path, ind))
-        
 
         process_data_rgb = self.transform(images_rgb)
         process_data_flow = self.transform(images_flow)
