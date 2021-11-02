@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from Recorder import Recorder
-from data_utils import RegnetLoader
+from data_utils import RegnetLoader, get_TSN_Data_set
 from logger import RegnetLogger
 from criterion import RegnetLoss
 from model import Regnet
