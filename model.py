@@ -282,9 +282,63 @@ class Decoder(nn.Module):
         return x
 
 
+class VisualFeatureExtractorCNN(nn.Module):
+    """
+    CNN Encoder to extract features from the images
+    In finetuning: initialized pretrained model adn update all of the model's parameters (retraining the whole model)
+    In feature extraction: Initialize pretrained model and only update the final layer weights
+    It is called feature extraction because we use the pretrained CNN as a fixed feature-extractor,
+    and only change the output layer.
+    """
+    def __init__(self, embed_dim=int(config.encoder_embedding_dim / 2), normalization='batch'):
+        super(VisualFeatureExtractorCNN, self).__init__()
+        model = models.resnet50(pretrained=True)
+        # Pass in the pretrained resnet model (18, 34, 50, 101, 152, etc.) parameter later
+        # Use pretrained ResNet18 as CNN encoder
+        # self.encoder = torch.hub.load('pytorch/vision:v0.9.0', 'resnet18', pretrained=True)
+        resnet = model
+        self.embed_dim = embed_dim
+        # self.batch_size = batch_size
+        # print("ResNet50 layers: ", list(resnet.children()))
+        # print("model parameters: ", resnet.parameters())
+        # Check if the requires_grad is set to true
+        # for param in resnet.parameters():
+        #     print(f'parmeter: {param}, and requires grad? {param.requires_grad}')
+
+        modules = list(resnet.children())[:-1]      # delete the last fc layer.
+        self.resnet = nn.Sequential(*modules)
+        self.linear = nn.Linear(resnet.fc.in_features, embed_dim)
+        # Use instance norm if batch size is 1
+        if normalization == 'batch':
+            self.bn = nn.BatchNorm1d(embed_dim, momentum=0.01)
+        else:
+            # InstanceNorm1d also doesn't work with 1 sample :(
+            self.bn = nn.InstanceNorm1d(embed_dim, momentum=0.01)
+
+        # Finetune the last residual block, not just the top fc layer
+ 
+    def forward(self, images):
+        """Extract feature vectors from input images, but with finetuning"""
+        #with torch.no_grad():
+            # Pass images through resnet, use no grad if don't want to train parts of the model
+            # Use no grad if only for feature extraction and don't want to finetune
+        # Retrain/finetune the entire pretrained resnet50 model
+        features = self.resnet(images)
+        features = features.reshape(features.size(0), -1)
+        # Pass the output through the new last fc layer and batchnorm
+        if self.batch_size > 1:
+            features = self.bn(self.linear(features))
+        else:
+            features = self.linear(features)
+        # Needs to output (batch, seq (time frames), feature)
+        return features
+
+
 class Frequency_Net(nn.Module):
     def __init__(self):
         super(Frequency_Net, self).__init__()
+        if config.train_visual_feature_extractor:
+            self.visual_feat_extractor = VisualFeatureExtractorCNN()
         self.encoder = Encoder()
         self.decoder = Modal_Impulse_Decoder()
         if config.mode_input == "":
@@ -301,6 +355,18 @@ class Frequency_Net(nn.Module):
             vis_thr, spec_thr = 0, 1
         else:
             print(self.mode_input)
+        # If want to train visual feature extractor, pass raw images through extractor first
+        if config.train_visual_feature_extractor:
+            # Input needs to be rgb and optical flow stacked images
+            rgb, flow = inputs
+            print(f"input rgb shape: {rgb.shape} and flow shape: {flow.shape}")
+            rgb_feat = self.visual_feat_extractor(rgb)
+            flow_feat = self.visual_feat_extractor(flow)
+            feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
+            inputs = torch.FloatTensor(feature.astype(np.float32))
+            print(f"visual feature extracted shape: {inputs.shape}")
+            #inputs = self.visual_feat_extractor(inputs)
+
         # Pass the input through the visual encoder
         encoder_output = self.encoder(inputs * vis_thr)
         self.decoder_output = self.decoder(encoder_output)

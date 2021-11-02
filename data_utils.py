@@ -4,8 +4,144 @@ import random
 import math
 import numpy as np
 import torch
+import torchvision
+from PIL import Image
 import torch.utils.data
 from config import _C as config
+
+
+class GroupScale(object):
+    def __init__(self, size, interpolation=Image.BILINEAR):
+        self.worker = torchvision.transforms.Scale(size, interpolation)
+
+    def __call__(self, img_group):
+        return [self.worker(img) for img in img_group]
+
+class GroupNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        rep_mean = self.mean * (tensor.size()[0]//len(self.mean))
+        rep_std = self.std * (tensor.size()[0]//len(self.std))
+
+        for t, m, s in zip(tensor, rep_mean, rep_std):
+            t.sub_(m).div_(s)
+
+        return tensor
+
+class Stack(object):
+
+    def __init__(self, roll=False):
+        self.roll = roll
+
+    def __call__(self, img_group):
+        if img_group[0].mode == 'L':
+            return np.concatenate([np.expand_dims(x, 2) for x in img_group], axis=2)
+        elif img_group[0].mode == 'RGB': # PIL Image.convert, can convert to different modes ("L", "RGB", "HSV", etc.)
+            if self.roll:
+                return np.concatenate([np.array(x)[:, :, ::-1] for x in img_group], axis=2)
+            else:
+                return np.concatenate(img_group, axis=2)
+
+class ToTorchFormatTensor(object):
+    """ Converts a PIL.Image (RGB) or numpy.ndarray (H x W x C) in the range [0, 255]
+    to a torch.FloatTensor of shape (C x H x W) in the range [0.0, 1.0] """
+    def __init__(self, div=True):
+        self.div = div
+
+    def __call__(self, pic):
+        if isinstance(pic, np.ndarray):
+            # handle numpy array
+            img = torch.from_numpy(pic).permute(2, 0, 1).contiguous()
+        else:
+            # handle PIL Image
+            img = torch.ByteTensor(torch.ByteStorage.from_buffer(pic.tobytes()))
+            img = img.view(pic.size[1], pic.size[0], len(pic.mode))
+            # put it from HWC to CHW format
+            # yikes, this transpose takes 80% of the loading time/CPU
+            img = img.transpose(0, 1).transpose(0, 2).contiguous()
+        return img.float().div(255) if self.div else img.float()
+
+
+def get_TSN_Data_set(args):
+    if args.modality == 'RGB':
+        image_tmpl="img_{:05d}.jpg"
+    elif args.modality == 'RGB_landmarks':
+        image_tmpl="img_{:05d}_landmarks.jpg"
+    else:
+        image_tmpl=args.flow_prefix+"flow_{}_{:05d}.jpg"
+
+    data_loader = torch.utils.data.DataLoader(
+            TSNDataSet(args.input_dir, args.test_list,
+                    modality=args.modality,
+                    #image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
+                    image_tmpl=image_tmpl,
+                    transform=torchvision.transforms.Compose([
+                        cropping, Stack(roll=True),
+                        ToTorchFormatTensor(div=False),
+                        GroupNormalize(net.input_mean, net.input_std),
+                    ])),
+            batch_size=1, shuffle=False,
+            num_workers=1, pin_memory=True)
+
+
+class TSNDataSet(Dataset):
+    def __init__(self, root_path, list_file, modality='RGB',
+                 image_tmpl='img_{:05d}.jpg', transform=None):
+
+        self.root_path = root_path
+        self.list_file = list_file
+        self.modality = modality
+        self.image_tmpl = image_tmpl
+        self.transform = transform
+        with open(list_file) as f:
+            self.video_list = [line.strip() for line in f]
+        f.close()
+
+    def _load_image(self, directory, idx):
+        if self.modality == 'RGB' or self.modality == 'RGB_landmarks':
+            return [Image.open(os.path.join(directory, self.image_tmpl.format(idx))).convert('RGB')]
+        elif self.modality == 'Flow':
+            x_img = Image.open(os.path.join(directory, self.image_tmpl.format('x', idx))).convert('L')
+            y_img = Image.open(os.path.join(directory, self.image_tmpl.format('y', idx))).convert('L')
+            return [x_img, y_img]
+
+    def __getitem__(self, index):
+        video_path = os.path.join(self.root_path, self.video_list[index])
+        images_rgb = list()
+        images_flow = list()
+        # Need to fix the regex for this one :(
+        #num_frames = len(glob(os.path.join(video_path, "img*.jpg")))
+        num_frames_rgb = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
+        #elif self.modality == 'RGB_landmarks':
+        #    num_frames = len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
+        #elif self.modality == 'Flow':
+        num_frames_flow = len(glob(os.path.join(video_path, "flow_x*.jpg")))
+
+        assert(num_frames_rgb == num_frames_flow)
+
+        # Get RGB images first
+        self.modality == 'RGB'
+        self.image_tmpl="img_{:05d}.jpg"
+        for ind in (np.arange(num_frames_rgb)+1):
+            images_rgb.extend(self._load_image(video_path, ind))
+
+        # Get flow images
+        self.modality == 'Flow'
+        self.image_tmpl = args.flow_prefix+"flow_{}_{:05d}.jpg"
+        for in in (np.arange(num_frames_flow)+1):
+            images_flow.extend(self._load_image(video_path, ind))
+        
+
+        process_data_rgb = self.transform(images_rgb)
+        process_data_flow = self.transform(images_flow)
+        return process_data_rgb, process_data_flow, video_path
+
+    def __len__(self):
+        return len(self.video_list)
+
 
 
 class RegnetLoader(torch.utils.data.Dataset):
