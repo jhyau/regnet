@@ -44,7 +44,7 @@ _C.extra_upsampling = True
 _C.include_landmarks = False
 
 # Logger parameters
-_C.exclude_D_r_f = True
+_C.exclude_D_r_f = False
 _C.exclude_gan_loss = True
 
 # Encoder parameters
@@ -56,6 +56,9 @@ _C.encoder_n_convolutions = 3
 
 # Modal impulse prediction parameters
 _C.n_modal_frequencies = 256
+_C.load_modal_data_type = "freqs_raw"
+_C.load_modal_data = True
+_C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 
 # Auxiliary parameters
 _C.auxiliary_type = "lstm_last"

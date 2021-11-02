@@ -11,22 +11,24 @@ class RegnetLogger(SummaryWriter):
                      iteration):
         self.add_scalar("training.loss", reduced_loss, iteration)
         self.add_scalar("learning.rate", learning_rate, iteration)
-        self.add_scalar("training.loss_G", model.loss_G, iteration)
-        self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
+        #self.add_scalar("training.loss_G", model.loss_G, iteration)
+        self.add_scalar("training.loss_L1", model.loss_L1, iteration)
+        #self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
 
         #if not self.exclude_gan_loss:
         #    self.add_scalar("training.loss_G_GAN", model.loss_G_GAN, iteration)
         
-        self.add_scalar("training.loss_G_L1", model.loss_G_L1, iteration)
-        self.add_scalar("training.loss_G_silence", model.loss_G_silence, iteration)
+        #self.add_scalar("training.loss_G_L1", model.loss_G_L1, iteration)
+        #self.add_scalar("training.loss_G_silence", model.loss_G_silence, iteration)
         
-        if not self.exclude_gan_loss:
-            self.add_scalar("training.loss_D", model.loss_D, iteration)
-            self.add_scalar("training.loss_D_fake", model.loss_D_fake, iteration)
-            self.add_scalar("training.loss_D_real", model.loss_D_real, iteration)
+        #if not self.exclude_gan_loss:
+        #    self.add_scalar("training.loss_D", model.loss_D, iteration)
+        #    self.add_scalar("training.loss_D_fake", model.loss_D_fake, iteration)
+        #    self.add_scalar("training.loss_D_real", model.loss_D_real, iteration)
 
         if not self.exclude_D_r_f:
-            self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
+            #self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
+            self.add_scalar("training.real-fake", (model.decoder_output - model.gt_raw_freqs).mean(), iteration)
         self.add_scalar("duration", duration, iteration)
 
     def log_testing(self, reduced_loss, epoch):

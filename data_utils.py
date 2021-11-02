@@ -24,9 +24,28 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
 
+        # Load modal response info (freqs, gains, dampings) to act as ground truth
+        self.load_modal_data = config.load_modal_data
+        self.load_modal_data_type = config.load_modal_data_type
+        self.n_modal_frequencies = config.n_modal_frequencies
+
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
         #print("Video IDs of dataset: ", self.video_ids)
+
+
+    def get_feature_modal_response(self, video_id):
+        im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
+        flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
+        modal_feat = os.path.join(config.modal_features_dir, video_id+"_"+self.load_modal_data_type+".npy") 
+
+        im = self.get_im(im_path)
+        flow = self.get_flow(flow_path)
+        feats = self.get_modal_feature(modal_feat)
+        feature = np.concatenate((im, flow), 1) # Visual dim=2048
+        feature = torch.FloatTensor(feature.astype(np.float32))
+        return (feature, feats, video_id)
+
 
     def get_feature_mel_pair(self, video_id):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
@@ -163,6 +182,11 @@ class RegnetLoader(torch.utils.data.Dataset):
             flow_padded = flow[0:self.video_samples, :]
         return flow_padded
 
+    def get_modal_feature(self, modal_path):
+        feat = np.load(modal_path)
+        assert feat.shape[-1] == self.n_modal_frequencies
+        return feat
+
     def get_land(self, land_path):
         with open(land_path, 'rb') as f:
             land = pickle.load(f, encoding='bytes')
@@ -199,7 +223,10 @@ class RegnetLoader(torch.utils.data.Dataset):
         return mel_center
 
     def __getitem__(self, index):
-        return self.get_feature_mel_pair(self.video_ids[index])
+        if self.load_modal_data:
+            return get_feature_modal_response(self.video_ids[index])
+        else:
+            return self.get_feature_mel_pair(self.video_ids[index])
 
     def __len__(self):
         return len(self.video_ids)

@@ -199,21 +199,36 @@ class Auxiliary_conv(nn.Module):
         return x
 
 
-class ModalImpulseDecoder(nn.Module):
+class Modal_Impulse_Decoder(nn.Module):
     """
     Takes the visual encoder output and predicts the vectors needed to generate modal impulse:
     - gains
     - frequencies
     - dampings
     """
-    def __init__(self, input_dim, output_dim):
-        super(ModalImpulseDecoder, self).__init__()
+    def __init__(self):
+        super(Modal_Impulse_Decoder, self).__init__()
+        # Set up the decoder's convolution layers
+        # Raw frequencies (1, 1, 256), raw gains: (1, 1, 256), raw dampings: (1, 256)
+        model = []
+        model += [nn.Conv1d(in_channels=int(config.encoder_embedding_dim/2), out_channels=int(config.encoder_embedding_dim/2),
+            kernel_size=5, stride=2, padding=2, dilation=1)]
+        model += [nn.BatchNorm1d(int(config.encoder_embedding_dim/2))]
+        model += [nn.ReLU(True)]
+
+        model += [nn.Conv1d(in_channels=int(config.encoder_embedding_dim/2), out_channels=1,
+            kernel_size=5, stride=2, padding=2, dilation=1)]
+        model += [nn.BatchNorm1d(int(config.encoder_embedding_dim/2))]
+        model += [nn.ReLU(True)]
+        self.model = nn.Sequential(*model)
+
         self.fc = nn.Linear(input_dim, output_dim)
         self.relu = torch.nn.ReLU() # instead of Heaviside step fn
 
     def forward(self, x):
-        fc_output = self.fc(x)
-        output = self.relu(fc_output) # instead of Heaviside step fn
+        output = self.model(x)
+        #fc_output = self.fc(x)
+        #output = self.relu(fc_output) # instead of Heaviside step fn
         return output
 
 
@@ -265,6 +280,175 @@ class Decoder(nn.Module):
         x = self.model(x)
         #print("decoder output size: ", x.size())
         return x
+
+
+class Frequency_Net(nn.Module):
+    def __init__(self):
+        super(Frequency_Net, self).__init__()
+        self.encoder = Encoder()
+        self.decoder = Modal_Impulse_Decoder()
+        if config.mode_input == "":
+            self.mode_input = "vis_spec" if self.training else "vis"
+        else:
+            self.mode_input = config.mode_input
+
+    def forward(self, inputs):
+        if self.mode_input == "vis_spec":
+            vis_thr, spec_thr = 1, 1
+        elif self.mode_input == "vis":
+            vis_thr, spec_thr = 1, 0
+        elif self.mode_input == "spec":
+            vis_thr, spec_thr = 0, 1
+        else:
+            print(self.mode_input)
+        # Pass the input through the visual encoder
+        encoder_output = self.encoder(inputs * vis_thr)
+        self.decoder_output = self.decoder(encoder_output)
+        return self.decoder_output
+
+
+class Modal_Response_Net(nn.Module):
+    def __init__(self):
+        super(Modal_Response_Net, self).__init__()
+        self.config = config
+        self.model_names = ["visual_encoder_frequency_decoder"]
+        self.device = torch.device('cuda:0')
+        self.freq_model = init_net(Frequency_Net(), (self.device))
+
+        # Reconstruction loss
+        if config.loss_type == "MSE":
+            loss_fn = nn.MSELoss()
+        elif config.loss_type == "L1Loss":
+            loss_fn = nn.L1Loss()
+        else:
+            print("ERROR LOSS TYPE!")
+        self.criterionL1 = loss_fn.to(self.device)
+        self.optimizer = torch.optim.Adam(self.freq_model.parameters(),
+                                            lr=config.lr, betas=(config.beta1, 0.999))
+        self.n_iter = -1
+
+    def parse_batch(self, batch):
+        input, raw_freqs, video_name = batch
+        self.inputs = input.to(self.device).float()
+        self.gt_raw_freqs = raw_freqs.to(self.device).float()
+        self.video_name = video_name
+
+    def forward(self):
+        # Pass the input through the visual encoder and frequency decoder
+        self.decoder_output = self.freq_model(self.inputs)
+        return self.decoder_output
+
+    def backward(self):
+        # Reconstruction loss for the predicted frequency
+        targets = self.gt_raw_freqs
+        targets.requires_grad = False
+        self.loss_L1 = self.criterionL1(self.decoder_output, targets)
+
+        # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
+        #self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
+
+        self.loss_L1.backward()
+
+
+    def get_scheduler(self, optimizer, config):
+        def lambda_rule(epoch):
+            # lr_l = 1.0 - max(0, epoch + 2 - config.niter) / float(config.epochs - config.niter + 1)
+            lr_l = 1.0 - max(0, epoch + 2 + config.epoch_count - config.niter) / float(config.epochs - config.niter + 1)
+            return lr_l
+
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+        return scheduler
+
+    def setup(self):
+        self.scheduler = self.get_scheduler(self.optimizer, config)  #[self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
+
+    def load_checkpoint(self, checkpoint_path):
+        for name in self.model_names:
+            filepath = "{}_net{}".format(checkpoint_path, name)
+            print("Loading net{} from checkpoint '{}'".format(name, filepath))
+            state_dict = torch.load(filepath, map_location='cpu')
+            if hasattr(state_dict, '_metadata'):
+                del state_dict._metadata
+
+            net = getattr(self, 'net' + name)
+            if isinstance(net, torch.nn.DataParallel):
+                net = net.module
+            checkpoint_state = state_dict["optimizer_net{}".format(name)]
+            net.load_state_dict(checkpoint_state)
+            self.iteration = state_dict["iteration"]
+
+            learning_rate = state_dict["learning_rate"]
+        #for index in range(len(self.optimizers)):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = learning_rate
+
+    def save_checkpoint(self, save_directory, iteration, do_not_delete=[], save_current=False):
+        # do_not_delete list of model_path checkpoints that shouldn't be deleted
+        lr = self.optimizer.param_groups[0]['lr']
+        for name in self.model_names:
+            filepath = os.path.join(save_directory, "checkpoint_{:0>6d}_net{}".format(iteration, name))
+            print("Saving net{} and optimizer state at iteration {} to {}".format(
+                name, iteration, filepath))
+            net = getattr(self, 'net' + name)
+            if torch.cuda.is_available():
+                torch.save({"iteration": iteration,
+                            "learning_rate": lr,
+                            "optimizer_net{}".format(name): net.module.cpu().state_dict()}, filepath)
+                net.to(self.device)
+            else:
+                torch.save({"iteration": iteration,
+                            "learning_rate": lr,
+                            "optimizer_net{}".format(name): net.cpu().state_dict()}, filepath)
+
+            if save_current:
+                do_not_delete.append(filepath)
+
+            """delete old model"""
+            model_list = glob.glob(os.path.join(save_directory, "checkpoint_*_*"))
+            model_list.sort()
+            for model_path in model_list[:-2]:
+                if model_path in do_not_delete:
+                    # Skip past the checkpoints that we want to keep
+                    continue
+                cmd = "rm {}".format(model_path)
+                print(cmd)
+                os.system(cmd)
+        return model_list[-1][:-5]
+
+
+    def update_learning_rate(self):
+        #for scheduler in self.schedulers:
+        self.scheduler.step()
+        lr = self.optimizer.param_groups[0]['lr']
+        print('learning rate = %.7f' % lr)
+
+    def set_requires_grad(self, nets, requires_grad=False):
+        if not isinstance(nets, list):
+            nets = [nets]
+        for net in nets:
+            if net is not None:
+                for param in net.parameters():
+                    param.requires_grad = requires_grad
+
+
+    def optimize_parameters(self):
+        self.n_iter += 1
+
+        # Determine which forward function to use
+        if config.pairing_loss:
+            self.forward_pairing_loss()
+        else:
+            self.forward()
+
+        # update G
+        self.set_requires_grad(self.netD, False)
+        self.optimizer.zero_grad()
+
+        if config.pairing_loss:
+            self.backward_G_pairing_loss()
+        else:
+            self.backward()
+        self.optimizer.step()
 
 
 class Regnet_G(nn.Module):
