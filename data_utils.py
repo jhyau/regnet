@@ -73,8 +73,19 @@ def get_TSN_Data_set(args):
     else:
         image_tmpl=args.flow_prefix+"flow_{}_{:05d}.jpg"
 
-    data_loader = torch.utils.data.DataLoader(
-            TSNDataSet(args.input_dir, args.test_list,
+    #data_loader = torch.utils.data.DataLoader(
+    #        TSNDataSet(args.input_dir, args.test_list,
+    #                modality=args.modality,
+    #                #image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
+    #                image_tmpl=image_tmpl,
+    #                transform=torchvision.transforms.Compose([
+    #                    cropping, Stack(roll=True),
+    #                    ToTorchFormatTensor(div=False),
+    #                    GroupNormalize(net.input_mean, net.input_std),
+    #                ])),
+    #        batch_size=1, shuffle=False,
+    #        num_workers=1, pin_memory=True)
+    return TSNDataSet(args.input_dir, args.test_list,
                     modality=args.modality,
                     #image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
                     image_tmpl=image_tmpl,
@@ -82,9 +93,7 @@ def get_TSN_Data_set(args):
                         cropping, Stack(roll=True),
                         ToTorchFormatTensor(div=False),
                         GroupNormalize(net.input_mean, net.input_std),
-                    ])),
-            batch_size=1, shuffle=False,
-            num_workers=1, pin_memory=True)
+                        ]))
 
 
 class TSNDataSet(torch.utils.data.Dataset):
