@@ -395,11 +395,13 @@ class Frequency_Net(nn.Module):
             #rgb_input_var = torch.autograd.Variable(rgb.view(rgb.size(0), -1, 3, rgb.size(2), rgb.size(3)))
             #rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
             rgb_feat = self.visual_feat_extractor(rgb, 3)
+            print(f"RGB feature shape: {rgb_feat.shape}")
 
             #flow_input_var = torch.autograd.Variable(flow.view(flow.size(0), -1, 2, flow.size(2), flow.size(3)))
             #flow_feat = torch.squeeze(self.flow_visual_feat_extractor(flow_input_var))
             #flow_feat = self.visual_feat_extractor(flow, 2) # TODO: optical flow needs a different feature extractor from resnet because these are gray-scale images
             #feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
+            #feature = torch.cat((rgb_feat, flow_feat), -1) # Concatenate along the last dimension
             #inputs = torch.FloatTensor(rgb_feat.astype(np.float32))
             inputs = rgb_feat
             print(f"visual feature extracted shape: {inputs.shape}")
