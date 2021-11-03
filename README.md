@@ -36,6 +36,18 @@ Demo videos containing sound generation results can be found [here][demo].
 
 Clone this repository into a directory. We refer to that directory as *`REGNET_ROOT`*.
 
+NOTE: Since this repo has submodules, need to clone recursively to get them:
+
+```bash
+git clone --recursive git@github.com:jhyau/regnet.git
+cd regnet
+```
+
+If git clone was already done without recursive, run this to get the submodules:
+```bash
+git submodule update --init --recursive
+```
+
 ```bash
 git clone https://github.com/PeihaoChen/regnet
 cd regnet
