@@ -94,8 +94,11 @@ def get_TSN_Data_set(args):
     print(f"Input dir: {args.input_dir}")
     print(f"Test list: {args.test_list}")
 
+    # BN-Inception mean and std
     input_mean = [104, 117, 128]
     input_std = [1]
+    #input_mean = [0.485, 0.456, 0.406]
+    #input_std = [0.229, 0.224, 0.225]
 
     return TSNDataSet(args.input_dir, args.test_list,
                     modality=args.modality,
@@ -132,10 +135,10 @@ class TSNDataSet(torch.utils.data.Dataset):
             return [x_img, y_img]
 
     def _get_modal_feature(self, video_name):
-        modal_path = os.path.join(config.modal_features_dir, os.path.join(video_name, "_"+config.load_modal_data_type+".npy"))
-        print(f"Get the gt vector: {modal_path}")
+        modal_path = os.path.join(config.modal_features_dir, video_name+"_"+config.load_modal_data_type+".npy")
+        #print(f"Get the gt vector: {modal_path}")
         feat = np.load(modal_path)
-        assert feat.shape[-1] == self.n_modal_frequencies
+        assert feat.shape[-1] == config.n_modal_frequencies
         return feat
 
     def __getitem__(self, index):
@@ -149,6 +152,11 @@ class TSNDataSet(torch.utils.data.Dataset):
         num_frames_flow = len(glob(os.path.join(video_path, "flow_x*.jpg")))
 
         assert(num_frames_rgb == num_frames_flow)
+
+        # Don't use all frames if video_samples is different
+        if num_frames_rgb != config.video_samples:
+            num_frames_rgb = config.video_samples
+            num_frames_flow = config.video_samples
 
         # Get RGB images first
         self.modality = 'RGB'

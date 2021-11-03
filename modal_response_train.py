@@ -45,7 +45,6 @@ def prepare_dataloaders(args):
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
-    print("first example: ", list(train_loader)[0])
     assert(len(trainset) > 0)
     assert(len(train_loader) > 0)
     return train_loader, test_loader

@@ -2,13 +2,17 @@ import glob
 import math
 import os
 import torch
+import numpy as np
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import init
 from torch.optim import lr_scheduler
 import torchvision.models as models
+from tsn.models import TSN
 from criterion import RegnetLoss
 from config import _C as config
+
+torch.cuda.empty_cache()
 
 def to_gpu(x, device):
     x = x.contiguous()
@@ -211,15 +215,16 @@ class Modal_Impulse_Decoder(nn.Module):
         super(Modal_Impulse_Decoder, self).__init__()
         # Set up the decoder's convolution layers
         # Raw frequencies (1, 1, 256), raw gains: (1, 1, 256), raw dampings: (1, 256)
+        # Visual encoder output has shape (batch size, video_samples, visual dim)
         model = []
-        model += [nn.Conv1d(in_channels=int(config.encoder_embedding_dim/2), out_channels=int(config.encoder_embedding_dim/2),
+        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=config.video_samples,
             kernel_size=5, stride=2, padding=2, dilation=1)]
-        model += [nn.BatchNorm1d(int(config.encoder_embedding_dim/2))]
+        model += [nn.BatchNorm1d(config.video_samples)]
         model += [nn.ReLU(True)]
 
-        model += [nn.Conv1d(in_channels=int(config.encoder_embedding_dim/2), out_channels=1,
+        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=1,
             kernel_size=5, stride=2, padding=2, dilation=1)]
-        model += [nn.BatchNorm1d(int(config.encoder_embedding_dim/2))]
+        model += [nn.BatchNorm1d(1)]
         model += [nn.ReLU(True)]
         self.model = nn.Sequential(*model)
 
@@ -299,7 +304,8 @@ class VisualFeatureExtractorCNN(nn.Module):
         # self.encoder = torch.hub.load('pytorch/vision:v0.9.0', 'resnet18', pretrained=True)
         resnet = model
         self.embed_dim = embed_dim
-        # self.batch_size = batch_size
+        self.device = torch.device('cuda:0')
+        self.batch_size = config.batch_size
         # print("ResNet50 layers: ", list(resnet.children()))
         # print("model parameters: ", resnet.parameters())
         # Check if the requires_grad is set to true
@@ -315,34 +321,55 @@ class VisualFeatureExtractorCNN(nn.Module):
 
         # Use instance norm if batch size is 1
         if normalization == 'batch':
-            self.bn = nn.BatchNorm1d(embed_dim, momentum=0.01)
+            #self.bn = nn.BatchNorm1d(embed_dim, momentum=0.01)
+            self.bn = nn.BatchNorm1d(config.video_samples, momentum=0.01)
         else:
             # InstanceNorm1d also doesn't work with 1 sample :(
-            self.bn = nn.InstanceNorm1d(embed_dim, momentum=0.01)
+            self.bn = nn.InstanceNorm1d(config.video_samples, momentum=0.01)
 
         # Finetune the last residual block, not just the top fc layer
  
-    def forward(self, images):
+    def forward(self, images, length):
         """Extract feature vectors from input images, but with finetuning"""
         #with torch.no_grad():
             # Pass images through resnet, use no grad if don't want to train parts of the model
             # Use no grad if only for feature extraction and don't want to finetune
         # Retrain/finetune the entire pretrained resnet50 model
-        features = self.resnet(images)
-        features = features.reshape(features.size(0), -1)
-        # Pass the output through the new last fc layer and batchnorm
-        if self.batch_size > 1:
-            features = self.bn(self.linear(features))
-        else:
+        # Expect input to be similar to (64, 3, 7, 7), so expects 3 channels (1 image)
+
+        # Shape: (batch size, 216, 3, 224, 224)
+        input_var = torch.autograd.Variable(images.view(images.size(0), -1, length, images.size(2), images.size(3)))
+
+        # Current input: (batch size, 216 * 3, 224, 224) or (batch size, 216 * 2, 224, 224)
+        #num_images = int(images.shape[1] / 3)
+        num_images = input_var.size(0)
+        print(f"reshaped input size: {input_var.size()}")
+        all_img_features = []
+        for idx in range(num_images): # Iterating through batch size now, so actually num videos
+            #print(f"img idx: {idx} out of {num_images}")
+            #features = self.resnet(images[:, int(idx*3):int(idx*3)+3 , :, :])
+            features = self.resnet(input_var[idx,:,:,:,:])
+            features = features.reshape(features.size(0), -1)
             features = self.linear(features)
+            all_img_features.append(features)
+            # Pass the output through the new last fc layer and batchnorm
+            #if config.batch_size > 1 and images.shape[0] > 1:
+            #    features = self.bn(self.linear(features))
+            #else:
+            #    features = self.linear(features)
+        final_feature = torch.stack(all_img_features, dim=0) # stack along batch size dimension
+        print(f"final feature size: {final_feature.shape}")
+        output = self.bn(final_feature)
         # Needs to output (batch, seq (time frames), feature)
-        return features
+        return output
 
 
 class Frequency_Net(nn.Module):
     def __init__(self):
         super(Frequency_Net, self).__init__()
         if config.train_visual_feature_extractor:
+            self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout)
+            self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout)
             self.visual_feat_extractor = VisualFeatureExtractorCNN()
         self.encoder = Encoder()
         self.decoder = Modal_Impulse_Decoder()
@@ -365,10 +392,16 @@ class Frequency_Net(nn.Module):
             # Input needs to be rgb and optical flow stacked images
             rgb, flow = inputs
             print(f"input rgb shape: {rgb.shape} and flow shape: {flow.shape}")
-            rgb_feat = self.visual_feat_extractor(rgb)
-            flow_feat = self.visual_feat_extractor(flow)
-            feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
-            inputs = torch.FloatTensor(feature.astype(np.float32))
+            #rgb_input_var = torch.autograd.Variable(rgb.view(rgb.size(0), -1, 3, rgb.size(2), rgb.size(3)))
+            #rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
+            rgb_feat = self.visual_feat_extractor(rgb, 3)
+
+            #flow_input_var = torch.autograd.Variable(flow.view(flow.size(0), -1, 2, flow.size(2), flow.size(3)))
+            #flow_feat = torch.squeeze(self.flow_visual_feat_extractor(flow_input_var))
+            #flow_feat = self.visual_feat_extractor(flow, 2) # TODO: optical flow needs a different feature extractor from resnet because these are gray-scale images
+            #feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
+            #inputs = torch.FloatTensor(rgb_feat.astype(np.float32))
+            inputs = rgb_feat
             print(f"visual feature extracted shape: {inputs.shape}")
             #inputs = self.visual_feat_extractor(inputs)
 
@@ -400,7 +433,8 @@ class Modal_Response_Net(nn.Module):
 
     def parse_batch(self, batch):
         raw_rgb, raw_flow, raw_freqs, video_name = batch
-        self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
+        #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
+        self.inputs = (raw_rgb.to(self.device).float(), raw_flow.float())
         self.gt_raw_freqs = raw_freqs.to(self.device).float()
         self.video_name = video_name
 
@@ -460,7 +494,8 @@ class Modal_Response_Net(nn.Module):
             filepath = os.path.join(save_directory, "checkpoint_{:0>6d}_net{}".format(iteration, name))
             print("Saving net{} and optimizer state at iteration {} to {}".format(
                 name, iteration, filepath))
-            net = getattr(self, 'net' + name)
+            #net = getattr(self, 'net' + name)
+            net = self.freq_model
             if torch.cuda.is_available():
                 torch.save({"iteration": iteration,
                             "learning_rate": lr,
@@ -511,8 +546,8 @@ class Modal_Response_Net(nn.Module):
         else:
             self.forward()
 
-        # update G
-        self.set_requires_grad(self.netD, False)
+        # update model
+        #self.set_requires_grad(self.netD, False)
         self.optimizer.zero_grad()
 
         if config.pairing_loss:

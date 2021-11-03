@@ -61,6 +61,11 @@ _C.load_modal_data = True
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 _C.train_visual_feature_extractor = True
 
+# Visual feature extractor parameters
+_C.consensus_type = 'avg' # 'max', 'topk'
+_C.dropout = 0.7
+-C.bn_inception_file = 'tsn/bninception/bn_inception_unfrozen.yaml'
+
 # Auxiliary parameters
 _C.auxiliary_type = "lstm_last"
 _C.auxiliary_dim = 256

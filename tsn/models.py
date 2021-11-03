@@ -6,13 +6,14 @@ from .bninception.pytorch_load import BNInception
 class TSN(nn.Module):
     def __init__(self, modality,
                  consensus_type='avg', before_softmax=True,
-                 dropout=0.8, partial_bn=True):
+                 dropout=0.8, partial_bn=True, model_path="tsn/bninception/bn_inception_unfrozen.yaml"):
         super(TSN, self).__init__()
         self.modality = modality
         self.reshape = True
         self.before_softmax = before_softmax
         self.dropout = dropout
         self.consensus_type = consensus_type
+        self.model_path = model_path
         if not before_softmax and consensus_type != 'avg':
             raise ValueError("Only avg consensus can be used after Softmax")
 
@@ -32,7 +33,7 @@ class TSN(nn.Module):
             self.partialBN(True)
 
     def _prepare_base_model(self):        
-        self.base_model = BNInception()
+        self.base_model = BNInception(model_path=self.model_path)
         self.base_model.last_layer_name = 'fc'
         self.input_size = 224
         self.input_mean = [104, 117, 128]
