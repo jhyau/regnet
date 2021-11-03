@@ -475,7 +475,8 @@ class Modal_Response_Net(nn.Module):
             if hasattr(state_dict, '_metadata'):
                 del state_dict._metadata
 
-            net = getattr(self, 'net' + name)
+            #net = getattr(self, 'net' + name)
+            net = self.freq_model
             if isinstance(net, torch.nn.DataParallel):
                 net = net.module
             checkpoint_state = state_dict["optimizer_net{}".format(name)]
