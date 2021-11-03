@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+from glob import glob
 import torch.utils.data
 from config import _C as config
 
@@ -73,6 +74,11 @@ def get_TSN_Data_set(args):
     else:
         image_tmpl=args.flow_prefix+"flow_{}_{:05d}.jpg"
 
+    print("Using input size: ", args.input_size)
+    cropping = torchvision.transforms.Compose([
+        GroupScale((args.input_size, args.input_size)),
+    ])
+
     #data_loader = torch.utils.data.DataLoader(
     #        TSNDataSet(args.input_dir, args.test_list,
     #                modality=args.modality,
@@ -85,15 +91,21 @@ def get_TSN_Data_set(args):
     #                ])),
     #        batch_size=1, shuffle=False,
     #        num_workers=1, pin_memory=True)
+    print(f"Input dir: {args.input_dir}")
+    print(f"Test list: {args.test_list}")
+
+    input_mean = [104, 117, 128]
+    input_std = [1]
+
     return TSNDataSet(args.input_dir, args.test_list,
                     modality=args.modality,
-                    #image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
-                    image_tmpl=image_tmpl,
+                    image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
+                    #image_tmpl=image_tmpl,
                     transform=torchvision.transforms.Compose([
                         cropping, Stack(roll=True),
                         ToTorchFormatTensor(div=False),
-                        GroupNormalize(net.input_mean, net.input_std),
-                        ]))
+                        GroupNormalize(input_mean, input_std),
+                    ]))
 
 
 class TSNDataSet(torch.utils.data.Dataset):
@@ -107,15 +119,24 @@ class TSNDataSet(torch.utils.data.Dataset):
         self.transform = transform
         with open(list_file) as f:
             self.video_list = [line.strip() for line in f]
+            print(f"Num videos in dataset: {len(self.video_list)}")
         f.close()
 
     def _load_image(self, directory, idx):
+        #print(f"modality: {self.modality} and template: {self.image_tmpl}")
         if self.modality == 'RGB' or self.modality == 'RGB_landmarks':
             return [Image.open(os.path.join(directory, self.image_tmpl.format(idx))).convert('RGB')]
         elif self.modality == 'Flow':
             x_img = Image.open(os.path.join(directory, self.image_tmpl.format('x', idx))).convert('L')
             y_img = Image.open(os.path.join(directory, self.image_tmpl.format('y', idx))).convert('L')
             return [x_img, y_img]
+
+    def _get_modal_feature(self, video_name):
+        modal_path = os.path.join(config.modal_features_dir, os.path.join(video_name, "_"+config.load_modal_data_type+".npy"))
+        print(f"Get the gt vector: {modal_path}")
+        feat = np.load(modal_path)
+        assert feat.shape[-1] == self.n_modal_frequencies
+        return feat
 
     def __getitem__(self, index):
         video_path = os.path.join(self.root_path, self.video_list[index])
@@ -124,28 +145,30 @@ class TSNDataSet(torch.utils.data.Dataset):
         # Need to fix the regex for this one :(
         #num_frames = len(glob(os.path.join(video_path, "img*.jpg")))
         num_frames_rgb = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
-        #elif self.modality == 'RGB_landmarks':
-        #    num_frames = len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
         #elif self.modality == 'Flow':
         num_frames_flow = len(glob(os.path.join(video_path, "flow_x*.jpg")))
 
         assert(num_frames_rgb == num_frames_flow)
 
         # Get RGB images first
-        self.modality == 'RGB'
+        self.modality = 'RGB'
         self.image_tmpl="img_{:05d}.jpg"
         for ind in (np.arange(num_frames_rgb)+1):
             images_rgb.extend(self._load_image(video_path, ind))
 
         # Get flow images
-        self.modality == 'Flow'
-        self.image_tmpl = args.flow_prefix+"flow_{}_{:05d}.jpg"
+        flow_prefix = ''
+        self.modality = 'Flow'
+        self.image_tmpl = flow_prefix+"flow_{}_{:05d}.jpg"
         for ind in (np.arange(num_frames_flow)+1):
             images_flow.extend(self._load_image(video_path, ind))
 
         process_data_rgb = self.transform(images_rgb)
         process_data_flow = self.transform(images_flow)
-        return process_data_rgb, process_data_flow, video_path
+
+        # Get the corresponding ground truth frequency
+        feat = self._get_modal_feature(self.video_list[index])
+        return (process_data_rgb, process_data_flow, feat, video_path)
 
     def __len__(self):
         return len(self.video_list)

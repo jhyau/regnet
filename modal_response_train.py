@@ -6,13 +6,14 @@ import shutil
 import time
 
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 import numpy as np
 from Recorder import Recorder
 from data_utils import RegnetLoader, get_TSN_Data_set
 from logger import RegnetLogger
 from criterion import RegnetLoss
-from model import Regnet
+from model import Regnet, Modal_Response_Net
 # from test import test_checkpoint
 from contextlib import redirect_stdout
 from config import _C as config
@@ -26,22 +27,25 @@ def prepare_dataloaders(args):
     #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
     if config.train_visual_feature_extractor:
-        args.test_list = 'filelists/asmr_by_material_1hr_train.txt ' 
+        print("Getting the images to be stacked...")
+        args.test_list = './filelists/asmr_by_material_1hr_train.txt' 
         trainset = get_TSN_Data_set(args)
-        args.test_list = 'filelists/asmr_by_material_1hr_test.txt '
+        args.test_list = './filelists/asmr_by_material_1hr_test.txt'
         valset = get_TSN_Data_set(args) 
     else:
         trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
         valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
-    train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
+    # Originally, num_workers is set to 4 (seems to go out of memory when loading raw images)
+    train_loader = DataLoader(trainset, num_workers=0, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
                               drop_last=True)
-    test_loader = DataLoader(valset, num_workers=4, shuffle=False,
+    test_loader = DataLoader(valset, num_workers=0, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
+    print("first example: ", list(train_loader)[0])
     assert(len(trainset) > 0)
     assert(len(train_loader) > 0)
     return train_loader, test_loader
@@ -95,6 +99,7 @@ def train(args):
     # Include the extra_upsampling parameter
     #model = Regnet(extra_upsampling=args.extra_upsampling, adversarial_loss=args.adversarial_loss)
     model = Modal_Response_Net()
+    print("Initialized model")
 
     # Reconstruction loss
     if config.loss_type == "MSE":
@@ -105,9 +110,11 @@ def train(args):
         print("ERROR LOSS TYPE!")
     criterion = loss_fn
     #criterion = RegnetLoss(config.loss_type)
+    print("Initialized loss")
 
     logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f, exclude_gan_loss=config.exclude_gan_loss)
 
+    print("Preparing data...")
     train_loader, test_loader = prepare_dataloaders(args)
 
     # Keep track of the lowest test evaluation loss achieved
@@ -133,6 +140,8 @@ def train(args):
     for epoch in tqdm(range(epoch_offset, config.epochs)):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
+            print(f"index: {i}, num items in batch: {len(batch)}")
+
             start = time.perf_counter()
             model.zero_grad()
 

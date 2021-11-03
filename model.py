@@ -6,6 +6,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.nn import init
 from torch.optim import lr_scheduler
+import torchvision.models as models
 from criterion import RegnetLoss
 from config import _C as config
 
@@ -222,8 +223,8 @@ class Modal_Impulse_Decoder(nn.Module):
         model += [nn.ReLU(True)]
         self.model = nn.Sequential(*model)
 
-        self.fc = nn.Linear(input_dim, output_dim)
-        self.relu = torch.nn.ReLU() # instead of Heaviside step fn
+        #self.fc = nn.Linear(input_dim, output_dim)
+        #self.relu = torch.nn.ReLU() # instead of Heaviside step fn
 
     def forward(self, x):
         output = self.model(x)
@@ -308,6 +309,10 @@ class VisualFeatureExtractorCNN(nn.Module):
         modules = list(resnet.children())[:-1]      # delete the last fc layer.
         self.resnet = nn.Sequential(*modules)
         self.linear = nn.Linear(resnet.fc.in_features, embed_dim)
+
+        # Another way to do finetuning
+        #resnet.fc = nn.Linear(resnet.fc.in_features, embed_dim)
+
         # Use instance norm if batch size is 1
         if normalization == 'batch':
             self.bn = nn.BatchNorm1d(embed_dim, momentum=0.01)
@@ -394,8 +399,8 @@ class Modal_Response_Net(nn.Module):
         self.n_iter = -1
 
     def parse_batch(self, batch):
-        input, raw_freqs, video_name = batch
-        self.inputs = input.to(self.device).float()
+        raw_rgb, raw_flow, raw_freqs, video_name = batch
+        self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
         self.gt_raw_freqs = raw_freqs.to(self.device).float()
         self.video_name = video_name
 

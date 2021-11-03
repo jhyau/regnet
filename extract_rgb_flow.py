@@ -41,7 +41,24 @@ def compute_TVL1(prev, curr, bound=20):
     flow-=-bound
     flow*=(255/float(2*bound))
     return flow
- 
+
+def check_video(video_paths, output_dir, input_dir):
+    # Only keep video paths that aren't done yet
+    if not os.path.exists(output_dir):
+        return video_paths
+
+    directories = os.listdir(output_dir)
+    done_vids = []
+    # Expect 216 images for each video (21.5 fps)
+    for dirs in directories:
+        rgbs = len(glob(os.path.join(dirs, "img*.jpg"))) - len(glob(os.path.join(dirs, "img*_landmarks.jpg")))
+        flows_x = len(glob(os.path.join(dirs, "flow_x*.jpg")))
+        flows_y = len(glob(os.path.join(dirs, "flow_y*.jpg")))
+        
+        if (flows_x == flows_y) and (flows_x == rgbs) and (flows_y == rgbs) and (rgbs == 216):
+            done_vids.append(os.path.join(input_dir, os.path.join(dirs, '.mp4')))
+    return done_vids
+
 if __name__ == '__main__':
     paser = argparse.ArgumentParser()
     paser.add_argument("-i", "--input_dir", default="data/features/dog/videos_10s_21.5fps")
@@ -59,6 +76,14 @@ if __name__ == '__main__':
     print("args for extracting rgb and optical flow features: ", args)
 
     video_paths = glob(P.join(input_dir, "*.mp4"))
+    print("All videos: ", video_paths)
+
+    # Check if some directories are already done
+    done_vids = check_video(video_paths, args.output_dir, args.input_dir)
+    video_paths = video_paths - done_vids
+    print("finished vids: ", don_vids)
+    print("Remaining videos: ", video_paths)
+
     video_paths.sort()
     with Pool(args.num_worker) as p:
         p.map(partial(cal_for_frames, output_dir=output_dir, 
