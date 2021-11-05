@@ -112,6 +112,7 @@ def get_TSN_Data_set(args):
 
 
 class TSNDataSet(torch.utils.data.Dataset):
+    """Modify to use per frame as data sample instead of per video"""
     def __init__(self, root_path, list_file, modality='RGB',
                  image_tmpl='img_{:05d}.jpg', transform=None):
 
