@@ -112,7 +112,10 @@ def get_TSN_Data_set(args):
 
 
 class TSNDataSet(torch.utils.data.Dataset):
-    """Modify to use per frame as data sample instead of per video"""
+    """Modify to use per frame as data sample instead of per video
+    Use this loader for getting the raw RGB/optical flow images
+    Note that the optical flow image indices start with 1 to 216
+    """
     def __init__(self, root_path, list_file, modality='RGB',
                  image_tmpl='img_{:05d}.jpg', transform=None):
 
@@ -159,7 +162,7 @@ class TSNDataSet(torch.utils.data.Dataset):
             num_frames_rgb = config.video_samples
             num_frames_flow = config.video_samples
 
-        # Get RGB images first
+        # Get RGB images first, rolling the number of frames into one stacked vector
         self.modality = 'RGB'
         self.image_tmpl="img_{:05d}.jpg"
         for ind in (np.arange(num_frames_rgb)+1):
@@ -186,7 +189,8 @@ class TSNDataSet(torch.utils.data.Dataset):
 
 class RegnetLoader(torch.utils.data.Dataset):
     """
-    loads image, flow feature, mel-spectrogramsfiles
+    loads image, flow feature, mel-spectrograms files
+    Use this loader for loading visual features
     """
 
     def __init__(self, list_file, max_sample=-1, include_landmarks=True, pairing_loss=True):
@@ -200,6 +204,10 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
 
+        # TODO: Load the features frame by frame if config is set
+        self.visual_features = config.visual_features # Use visual features if true. Use raw frames/image if false
+        self.per_frame = config.per_frame # Loads data where each frame is an example instead of each video
+
         # Load modal response info (freqs, gains, dampings) to act as ground truth
         self.load_modal_data = config.load_modal_data
         self.load_modal_data_type = config.load_modal_data_type
@@ -208,6 +216,19 @@ class RegnetLoader(torch.utils.data.Dataset):
         with open(list_file, encoding='utf-8') as f:
             self.video_ids = [line.strip() for line in f]
         #print("Video IDs of dataset: ", self.video_ids)
+        if self.per_frame:
+            self.total_len = 0
+            for vid in self.video_ids:
+                video_path = os.path.join(config.optical_flow_dir, vid)
+                num_frames_rgb = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
+                num_frames_flow = len(glob(os.path.join(video_path, "flow_x*.jpg")))
+                assert(num_frames_rgb == num_frames_flow)
+                
+                # If want only a subset of frames from each video
+                if config.video_samples < num_frames_flow:
+                    self.total_len += config.video_samples
+                else:
+                    self.total_len += num_frames_flow
 
 
     def get_feature_modal_response(self, video_id):
@@ -399,10 +420,41 @@ class RegnetLoader(torch.utils.data.Dataset):
         return mel_center
 
     def __getitem__(self, index):
+        if self.per_frame:
+            # Get video id (where 0-216 are for first video, 217-432 are second video, etc.)
+            vid_id = int(index / config.video_samples)
+            # frame ID based on mod on number of video samples (num frames per video wanted)
+            frame_id = index % config.video_samples
+            return self.__get_frames(vid_id, frame_id)
         if self.load_modal_data:
             return get_feature_modal_response(self.video_ids[index])
         else:
             return self.get_feature_mel_pair(self.video_ids[index])
 
+    def __get_frames__(self, vid_id, frame_index):
+        """
+        Gets frame of feature vector from all the provided videos
+        Also get the classification label (ceramic-plate, glass, etc.)
+        """
+        video_id = self.video_ids[vid_id]
+        im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
+        flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
+
+        # TODO: Figure out the classification label
+        label = ""
+        
+        im = self.get_im(im_path)[frame_index, :]
+        flow = self.get_flow(flow_path)[frame_index, :]
+        feature = np.concatenate((im, flow), 1) # Visual dim=2048
+
+        feature = torch.FloatTensor(feature.astype(np.float32))
+        return (feature, label, video_id)
+
+
     def __len__(self):
-        return len(self.video_ids)
+        if not self.per_frame:
+            # Per video examples
+            return len(self.video_ids)
+        else:
+            # Per frame examples
+            return self.total_len

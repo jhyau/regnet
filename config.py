@@ -16,8 +16,10 @@ _C.exclude_dirs = ['ckpt', 'data']
 _C.training_files = 'filelists/asmr_both_vids_train.txt'  #'filelists/dog_train.txt'
 _C.test_files = 'filelists/asmr_both_vids_test.txt'  #'filelists/dog_test.txt'
 _C.rgb_feature_dir = "data/features/ASMR/asmr_both_vids/feature_rgb_bninception_dim1024_21.5fps"  #"data/features/dog/feature_rgb_bninception_dim1024_21.5fps"
+_C.optical_flow_dir = "data/features/ASMR/orig_asmr_by_material_clips/OF_10s_21.5fps/" # Path to the optical flow extraction dir with raw images
 # New: landmark feature dir
 _C.landmark_feature_dir = None
+
 _C.flow_feature_dir = "data/features/ASMR/asmr_both_vids/feature_flow_bninception_dim1024_21.5fps"  #"data/features/dog/feature_flow_bninception_dim1024_21.5fps"
 _C.mel_dir = "data/features/ASMR/asmr_both_vids/melspec_10s_44100hz"  #"data/features/dog/melspec_10s_22050hz"
 _C.video_samples = 215 # Number of frames in each video. First dim of the feature vectors
@@ -60,6 +62,10 @@ _C.load_modal_data_type = "freqs_raw"
 _C.load_modal_data = True
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 _C.train_visual_feature_extractor = True
+
+# Data loading parameters
+_C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
+_C.per_frame = True # Loads data where each frame is an example instead of each video
 
 # Visual feature extractor parameters
 _C.consensus_type = 'avg' # 'max', 'topk'
