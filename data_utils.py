@@ -204,8 +204,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
 
-        # TODO: Load the features frame by frame if config is set
-        self.visual_features = config.visual_features # Use visual features if true. Use raw frames/image if false
+        # Load the features frame by frame if config is set
         self.per_frame = config.per_frame # Loads data where each frame is an example instead of each video
 
         # Load modal response info (freqs, gains, dampings) to act as ground truth
@@ -217,6 +216,8 @@ class RegnetLoader(torch.utils.data.Dataset):
             self.video_ids = [line.strip() for line in f]
         #print("Video IDs of dataset: ", self.video_ids)
         if self.per_frame:
+            # Get the labels (all classes)
+            self.classes = set()
             self.total_len = 0
             for vid in self.video_ids:
                 video_path = os.path.join(config.optical_flow_dir, vid)
@@ -230,6 +231,9 @@ class RegnetLoader(torch.utils.data.Dataset):
                 else:
                     self.total_len += num_frames_flow
 
+                # Get label for classes
+                label = self.__get_label__(vid)
+                self.classes.add(label)
 
     def get_feature_modal_response(self, video_id):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
@@ -431,6 +435,19 @@ class RegnetLoader(torch.utils.data.Dataset):
         else:
             return self.get_feature_mel_pair(self.video_ids[index])
 
+    def __get_label__(self, video_name):
+        """Getting the corresponding label from the video name"""
+        tokens = video_name.split("-")
+        # <video_name>-[label-label]-<num>-of-<num>
+        start_index = 1
+        end_index = -4
+        label_tokens = tokens[start_index:(end_index+1)]
+        label = ""
+        for tok in label_tokens:
+            label += tok + " "
+        print(f"label of video: {label}")
+        return label
+
     def __get_frames__(self, vid_id, frame_index):
         """
         Gets frame of feature vector from all the provided videos
@@ -441,7 +458,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
 
         # TODO: Figure out the classification label
-        label = ""
+        label = self.__get_label(video_id)
         
         im = self.get_im(im_path)[frame_index, :]
         flow = self.get_flow(flow_path)[frame_index, :]
