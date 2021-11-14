@@ -444,7 +444,10 @@ class RegnetLoader(torch.utils.data.Dataset):
         label_tokens = tokens[start_index:(end_index+1)]
         label = ""
         for tok in label_tokens:
-            label += tok + " "
+            # Count the labels with 2 as duplicates (for now)
+            if not tok.isdigit():
+                label += tok + " "
+
         print(f"label of video: {label}")
         return label
 
@@ -457,7 +460,6 @@ class RegnetLoader(torch.utils.data.Dataset):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
         flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
 
-        # TODO: Figure out the classification label
         label = self.__get_label(video_id)
         
         im = self.get_im(im_path)[frame_index, :]

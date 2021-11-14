@@ -85,6 +85,200 @@ class Postnet(nn.Module):
 
         return x
 
+class MaterialClassificationNet(nn.Module):
+    """Network to learn task of classifying material given video"""
+    def __init__(self, num_classes):
+        # Number of classes for classification task (returned from dataset)
+        self.num_classes = num_classes
+        self.config = config
+        self.model_names = ["material_classification_model"]
+        self.device = torch.device('cuda:0')
+        self.classifier_model = init_net(EncoderClassifier(num_classes), self.device)
+
+        # Classification loss: CrossEntropy
+        if config.loss_type == 'cross_entropy':
+            loss_fn = nn.CrossEntropyLoss()
+        elif config.loss_type == 'nll':
+            loss_fn = nn.NLLLoss()
+        else:
+            raise("Error, unknown loss!")
+        self.criterionL1 = loss_fn.to(self.device)
+
+        # Also include contrastive loss
+
+        self.optimizer = torch.optim.Adam(self.classifier_model.parameters(),
+                                            lr=config.lr, betas=(config.beta1, 0.999))
+        self.n_iter = -1
+
+    def parse_batch(self, batch):
+        inputs, labels, video_name = batch
+        #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
+        self.inputs = inputs.to(self.device).float()
+        self.labels = labels.to(self.device)
+        self.video_name = video_name
+
+    def forward(self):
+        # Pass the input through the visual encoder and classifier model
+        self.output = self.classifier_model(self.inputs)
+        return self.output
+
+    def backward(self):
+        # Classification loss for predicted material class/type
+        targets = self.labels
+        targets.requires_grad = False
+        self.loss_L1 = self.criterionL1(self.output, targets)
+
+        # TODO: Include contrastive loss
+
+        self.loss_L1.backward()
+
+
+    def get_scheduler(self, optimizer, config):
+        def lambda_rule(epoch):
+            # lr_l = 1.0 - max(0, epoch + 2 - config.niter) / float(config.epochs - config.niter + 1)
+            lr_l = 1.0 - max(0, epoch + 2 + config.epoch_count - config.niter) / float(config.epochs - config.niter + 1)
+            return lr_l
+
+        scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda_rule)
+        return scheduler
+
+    def setup(self):
+        self.scheduler = self.get_scheduler(self.optimizer, config)  #[self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
+
+    def load_checkpoint(self, checkpoint_path):
+        for name in self.model_names:
+            filepath = "{}_net{}".format(checkpoint_path, name)
+            print("Loading net{} from checkpoint '{}'".format(name, filepath))
+            state_dict = torch.load(filepath, map_location='cpu')
+            if hasattr(state_dict, '_metadata'):
+                del state_dict._metadata
+
+            #net = getattr(self, 'net' + name)
+            net = self.classifier_model
+            if isinstance(net, torch.nn.DataParallel):
+                net = net.module
+            checkpoint_state = state_dict["optimizer_net{}".format(name)]
+            net.load_state_dict(checkpoint_state)
+            self.iteration = state_dict["iteration"]
+
+            learning_rate = state_dict["learning_rate"]
+        #for index in range(len(self.optimizers)):
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = learning_rate
+
+    def save_checkpoint(self, save_directory, iteration, do_not_delete=[], save_current=False):
+        # do_not_delete list of model_path checkpoints that shouldn't be deleted
+        lr = self.optimizer.param_groups[0]['lr']
+        for name in self.model_names:
+            filepath = os.path.join(save_directory, "checkpoint_{:0>6d}_net{}".format(iteration, name))
+            print("Saving net{} and optimizer state at iteration {} to {}".format(
+                name, iteration, filepath))
+            #net = getattr(self, 'net' + name)
+            net = self.classifier_model
+            if torch.cuda.is_available():
+                torch.save({"iteration": iteration,
+                            "learning_rate": lr,
+                            "optimizer_net{}".format(name): net.module.cpu().state_dict()}, filepath)
+                net.to(self.device)
+            else:
+                torch.save({"iteration": iteration,
+                            "learning_rate": lr,
+                            "optimizer_net{}".format(name): net.cpu().state_dict()}, filepath)
+
+            if save_current:
+                do_not_delete.append(filepath)
+
+            """delete old model"""
+            model_list = glob.glob(os.path.join(save_directory, "checkpoint_*_*"))
+            model_list.sort()
+            for model_path in model_list[:-2]:
+                if model_path in do_not_delete:
+                    # Skip past the checkpoints that we want to keep
+                    continue
+                cmd = "rm {}".format(model_path)
+                print(cmd)
+                os.system(cmd)
+        return model_list[-1][:-5]
+
+
+    def update_learning_rate(self):
+        #for scheduler in self.schedulers:
+        self.scheduler.step()
+        lr = self.optimizer.param_groups[0]['lr']
+        print('learning rate = %.7f' % lr)
+
+    def set_requires_grad(self, nets, requires_grad=False):
+        if not isinstance(nets, list):
+            nets = [nets]
+        for net in nets:
+            if net is not None:
+                for param in net.parameters():
+                    param.requires_grad = requires_grad
+
+
+    def optimize_parameters(self):
+        self.n_iter += 1
+
+        # Determine which forward function to use
+        self.forward()
+
+        # update model
+        #self.set_requires_grad(self.netD, False)
+        self.optimizer.zero_grad()
+        self.backward()
+        self.optimizer.step()
+
+
+class EncoderClassifier(nn.Module):
+    # Classifier part should be conv + linear layer + relu + softmax
+    # Visual encoder output (no LSTM): (batch size, video samples, encoder embedding dim)
+    # After conv layer: (batch size, 1, encoder embedding dim)
+    # Squeeze the result to get (batch size, encoder embedding dim)
+    # Send through linear layer to get: (batch size, num classes)
+    # Send this through softmax
+    # But need to make sure input to linear layer is flattened
+    def __init__(self, num_classes):
+        super(EncoderClassifier, self).__init__()
+        self.num_classes = num_classes
+
+        if config.mode_input == "":
+            self.mode_input = "vis_spec" if self.training else "vis"
+        else:
+            self.mode_input = config.mode_input
+
+        # Initialize the visual encoder
+        self.encoder = Encoder()
+
+        # Classifier architecture
+        conv_model = []
+        conv_model += [nn.Conv1d(in_channels=config.video_samples, out_channels=1,
+            kernel_size=5, stride=1, padding=2, dilation=1)] # third dim (L in pytorch docs) does not change
+        conv_model += [nn.BatchNorm1d(1)]
+        conv_model += [nn.ReLU(True)]
+        self.conv_model = nn.Sequential(*conv_model)
+
+        # Linear layer + softmax
+        fc_model = []
+        fc_model += [nn.Linear(config.encoder_embedding_dim, num_classes)]
+        fc_model += [nn.ReLU(True)]
+
+        if config.loss_type == 'nll':
+            fc_model += [nn.LogSoftmax(dim=1)] # dim along which log softmax is computed so every slice along dim sums to 1
+            # Softmax will be done automatically with nn.CrossEntropyLoss. with nn.NLLoss, need to include the log softmax layer
+        self.fc_model = nn.Sequential(*fc_model)
+        
+    def forward(self, x):
+        # Pass input through the visual encoder
+        x = self.encoder(x)
+
+        # Output from visual encoder (no LSTM for now) to feed into this network
+        conv_output = self.conv_model(x)
+        
+        # Squeeze before sending through fully connected layer and softmax
+        fc_input = torch.squeeze(conv_output)
+        predictions = self.fc_model(fc_input)
+        return predictions
+
 
 class Encoder(nn.Module):
 
@@ -120,7 +314,12 @@ class Encoder(nn.Module):
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
         x = x.transpose(1, 2)
-        #print("before bilstm: ", x.size())
+        print("before bilstm: ", x.size())
+
+        # For classification, don't need to go through BiLISTM
+        if config.classification:
+            return x
+
         x, _ = self.BiLSTM(x)
         #print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
@@ -419,7 +618,7 @@ class Modal_Response_Net(nn.Module):
         self.config = config
         self.model_names = ["visual_encoder_frequency_decoder"]
         self.device = torch.device('cuda:0')
-        self.freq_model = init_net(Frequency_Net(), (self.device))
+        self.freq_model = init_net(Frequency_Net(), self.device)
 
         # Reconstruction loss
         if config.loss_type == "MSE":

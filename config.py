@@ -39,6 +39,9 @@ _C.temporal_alignment_lambda = 1.0 # Weight for temporal loss
 # Use visual encoder output as input to the second network/discriminator
 _C.visual_encoder_input = True
 
+# Classification task
+_C.classification = True
+
 # Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
 _C.extra_upsampling = True
 
@@ -70,7 +73,7 @@ _C.per_frame = True # Loads data where each frame is an example instead of each 
 # Visual feature extractor parameters
 _C.consensus_type = 'avg' # 'max', 'topk'
 _C.dropout = 0.7
--C.bn_inception_file = 'tsn/bninception/bn_inception_unfrozen.yaml'
+_C.bn_inception_file = 'tsn/bninception/bn_inception_unfrozen.yaml'
 
 # Auxiliary parameters
 _C.auxiliary_type = "lstm_last"
