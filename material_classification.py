@@ -143,7 +143,7 @@ def train(args):
     for epoch in tqdm(range(epoch_offset, config.epochs)):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
-            print(f"index: {i}, num items in batch: {len(batch)}, batch shape: {batch.shape}")
+            print(f"index: {i}, num items in batch: {len(batch)}")
 
             start = time.perf_counter()
             model.zero_grad()
