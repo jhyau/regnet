@@ -128,7 +128,7 @@ class MaterialClassificationNet(nn.Module):
         targets.requires_grad = False
         self.loss_L1 = self.criterionL1(self.output, targets)
 
-        # TODO: Include contrastive loss
+        # TODO: Include contrastive loss (Normalized Temperature-Scaled Cross-Entropy Loss from SimCLR paper)
 
         self.loss_L1.backward()
 
