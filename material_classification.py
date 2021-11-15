@@ -192,9 +192,6 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_dir', type=str)
-    parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
-    parser.add_argument('-t', '--test_list', type=str)
     parser.add_argument('--input_size', type=int, default=224)
     parser.add_argument('--crop_fusion_type', type=str, default='avg',
                         choices=['avg', 'max', 'topk'])

@@ -455,7 +455,8 @@ class RegnetLoader(torch.utils.data.Dataset):
             vid_id = int(index / config.video_samples)
             # frame ID based on mod on number of video samples (num frames per video wanted)
             frame_id = index % config.video_samples
-            return self.__get_frames(vid_id, frame_id)
+            print(f"index: {index}, vid_id: {vid_id}, frame id: {frame_id}")
+            return self.__get_frames__(vid_id, frame_id)
         if self.load_modal_data:
             return get_feature_modal_response(self.video_ids[index])
         else:

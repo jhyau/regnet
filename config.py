@@ -64,7 +64,7 @@ _C.n_modal_frequencies = 256
 _C.load_modal_data_type = "freqs_raw"
 _C.load_modal_data = True
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
-_C.train_visual_feature_extractor = True
+_C.train_visual_feature_extractor = False
 
 # Data loading parameters
 _C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
