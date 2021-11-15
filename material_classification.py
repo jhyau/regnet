@@ -14,7 +14,7 @@ from Recorder import Recorder
 from data_utils import RegnetLoader, get_TSN_Data_set
 from logger import RegnetLogger
 from criterion import RegnetLoss
-from model import Regnet, Modal_Response_Net
+from model import Regnet, Modal_Response_Net, MaterialClassificationNet
 # from test import test_checkpoint
 from contextlib import redirect_stdout
 from config import _C as config
@@ -51,7 +51,7 @@ def prepare_dataloaders(args):
     return train_loader, test_loader
 
 
-def test_model(model, criterion, test_loader, epoch, logger, visualization=False):
+def test_model(model, criterion, test_loader, epoch, logger, visualization=True):
     model.eval()
     reduced_loss_ = []
     with torch.no_grad():
@@ -85,8 +85,8 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
             os.makedirs(viz_dir, exist_ok=True)
             
             # Create confusion matrix
-            matrix = confusion_matrix(y_true, y_pred, labels=test_loader.le.classes_)
-            disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.le.classes_)
+            matrix = confusion_matrix(y_true, y_pred, labels=test_loader.dataset.le.classes_)
+            disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
             disp.plot()
             plt.title(f'test: epoch_{epoch:05d}')
             plt.savefig(os.path.join(viz_dir, f'epoch_{epoch:05d}.jpg'))
@@ -117,7 +117,7 @@ def train(args):
     train_loader, test_loader = prepare_dataloaders(args)
 
     # Need the number of classes when initialize model
-    model = MaterialClassificationNet(len(train_loader.classes))
+    model = MaterialClassificationNet(len(train_loader.dataset.classes))
     print("Initialized model")
 
     # Keep track of the lowest test evaluation loss achieved
@@ -143,7 +143,7 @@ def train(args):
     for epoch in tqdm(range(epoch_offset, config.epochs)):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
-            print(f"index: {i}, num items in batch: {len(batch)}")
+            print(f"index: {i}, num items in batch: {len(batch)}, batch shape: {batch.shape}")
 
             start = time.perf_counter()
             model.zero_grad()

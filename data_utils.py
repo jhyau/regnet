@@ -243,13 +243,13 @@ class RegnetLoader(torch.utils.data.Dataset):
             # Use label encoder
             self.classes = list(self.classes) # Convert from set to list
             self.le.fit(self.classes)
-            print(f"Class list: {self.classes}")
-            print(f"label encoder classes: {self.le.classes_}")
+            assert(self.classes.sort() == self.le.classes_.sort()) # make sure same classes are all encoded
+
 
     def get_all_material_classes(self):
         """Finds and saves all possible classes for classification"""
         # Get all possible classes
-        all_vids = os.path.join(config.optical_flow_dir)
+        all_vids = os.listdir(config.optical_flow_dir)
         for vid in all_vids:
             video_path = os.path.join(config.optical_flow_dir, vid)
             num_frames_rgb = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
@@ -455,7 +455,7 @@ class RegnetLoader(torch.utils.data.Dataset):
             vid_id = int(index / config.video_samples)
             # frame ID based on mod on number of video samples (num frames per video wanted)
             frame_id = index % config.video_samples
-            print(f"index: {index}, vid_id: {vid_id}, frame id: {frame_id}")
+            #print(f"index: {index}, vid_id: {vid_id}, frame id: {frame_id}")
             return self.__get_frames__(vid_id, frame_id)
         if self.load_modal_data:
             return get_feature_modal_response(self.video_ids[index])
@@ -475,10 +475,7 @@ class RegnetLoader(torch.utils.data.Dataset):
             if not tok.isdigit():
                 label += tok + " "
 
-        # Transform with label encoder
-        encoded = self.le.transform([label])[0]
-        print(f"label of video: {label} and encoded ver. {encoded}")
-        return label, encoded
+        return label.strip()
 
     def __get_frames__(self, vid_id, frame_index):
         """
@@ -489,10 +486,14 @@ class RegnetLoader(torch.utils.data.Dataset):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
         flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
 
-        label, encoded = self.__get_label(video_id)
-        
-        im = self.get_im(im_path)[frame_index, :]
-        flow = self.get_flow(flow_path)[frame_index, :]
+        label = self.__get_label__(video_id)
+        # Transform with label encoder
+        encoded = self.le.transform([label])[0]
+        #print(f"label of video: {label} and encoded ver. {encoded}")
+
+        # Keep the single frame as 1 dim in time, so (1, 1024), not (1024,)
+        im = self.get_im(im_path)[frame_index:frame_index+1, :]
+        flow = self.get_flow(flow_path)[frame_index:frame_index+1, :]
         feature = np.concatenate((im, flow), 1) # Visual dim=2048
 
         feature = torch.FloatTensor(feature.astype(np.float32))

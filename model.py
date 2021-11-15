@@ -88,6 +88,7 @@ class Postnet(nn.Module):
 class MaterialClassificationNet(nn.Module):
     """Network to learn task of classifying material given video"""
     def __init__(self, num_classes):
+        super(MaterialClassificationNet, self).__init__()
         # Number of classes for classification task (returned from dataset)
         self.num_classes = num_classes
         self.config = config
@@ -251,8 +252,13 @@ class EncoderClassifier(nn.Module):
 
         # Classifier architecture
         conv_model = []
-        conv_model += [nn.Conv1d(in_channels=config.video_samples, out_channels=1,
-            kernel_size=5, stride=1, padding=2, dilation=1)] # third dim (L in pytorch docs) does not change
+        # Per frame, then input is only 1 channel
+        if config.per_frame:
+            conv_model += [nn.Conv1d(in_channels=1, out_channels=1,
+                kernel_size=5, stride=1, padding=2, dilation=1)] # third dim (L in pytorch docs) does not change
+        else:
+            conv_model += [nn.Conv1d(in_channels=config.video_samples, out_channels=1,
+                kernel_size=5, stride=1, padding=2, dilation=1)] # third dim (L in pytorch docs) does not change
         conv_model += [nn.BatchNorm1d(1)]
         conv_model += [nn.ReLU(True)]
         self.conv_model = nn.Sequential(*conv_model)
@@ -314,7 +320,7 @@ class Encoder(nn.Module):
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
         x = x.transpose(1, 2)
-        print("before bilstm: ", x.size())
+        #print("before bilstm: ", x.size())
 
         # For classification, don't need to go through BiLISTM
         if config.classification:
