@@ -61,7 +61,7 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=True)
 
         for i, batch in enumerate(test_loader):
             model.parse_batch(batch)
-            model.forwardi()
+            model.forward()
 
             targets = model.labels
             targets.requires_grad = False
@@ -89,6 +89,7 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=True)
             disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
             disp.plot()
             plt.title(f'test: epoch_{epoch:05d}')
+            plt.show()
             plt.savefig(os.path.join(viz_dir, f'epoch_{epoch:05d}.jpg'))
             plt.close()
 
@@ -143,7 +144,7 @@ def train(args):
     for epoch in tqdm(range(epoch_offset, config.epochs)):
         print("Epoch: {}".format(epoch))
         for i, batch in enumerate(train_loader):
-            print(f"index: {i}, num items in batch: {len(batch)}")
+            #print(f"index: {i}, num items in batch: {len(batch)}")
 
             start = time.perf_counter()
             model.zero_grad()
@@ -176,7 +177,7 @@ def train(args):
 
         if epoch % config.num_epoch_save == 0:
             print("evaluation and save model")
-            test_loss = test_model(model, criterion, test_loader, epoch, logger, visualization=False)
+            test_loss = test_model(model, criterion, test_loader, epoch, logger, visualization=True)
             if test_loss < lowest_test_loss:
                 lowest_test_loss = test_loss
                 print('Lower test loss! At epoch: ', epoch)
