@@ -68,8 +68,9 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=True)
             loss = criterion(model.output, targets)
 
             if visualization:
-                # Take the max along the classes dimension
-                preds = torch.max(model.output, dim=1).tolist()
+                # Take the max along the classes dimension, where the index of the max is the predicted class
+                values, indices = torch.max(model.output, dim=1)
+                preds = indices.tolist()
                 y_pred += preds
 
                 # Get the labels
@@ -85,9 +86,12 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=True)
             os.makedirs(viz_dir, exist_ok=True)
             
             # Create confusion matrix
-            matrix = confusion_matrix(y_true, y_pred, labels=test_loader.dataset.le.classes_)
+            # transformed labels
+            lab = test_loader.dataset.le.transform(test_loader.dataset.le.classes_)
+            matrix = confusion_matrix(y_true, y_pred, labels=lab)
             disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
             disp.plot()
+            plt.xticks(rotation=90)
             plt.title(f'test: epoch_{epoch:05d}')
             plt.show()
             plt.savefig(os.path.join(viz_dir, f'epoch_{epoch:05d}.jpg'))
