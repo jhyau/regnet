@@ -72,6 +72,11 @@ def test_model(args, visualization=True):
     print("Preparing data...")
     train_loader, test_loader = prepare_dataloaders(args)
 
+    if args.eval_train:
+        loader = train_loader
+    else:
+        loader = test_loader
+
     # Need the number of classes when initialize model
     model = MaterialClassificationNet(len(train_loader.dataset.classes))
     if config.checkpoint_path != '':
@@ -88,7 +93,7 @@ def test_model(args, visualization=True):
         y_true_total = []
         y_pred_total = []
 
-        for i, batch in enumerate(test_loader):
+        for i, batch in enumerate(loader):
             model.parse_batch(batch)
             model.forward()
 
@@ -133,18 +138,59 @@ def test_model(args, visualization=True):
         if visualization:
             viz_dir = os.path.join(config.save_dir, "inference_viz")
             os.makedirs(viz_dir, exist_ok=True)
-            
+
+            # Set axes label size to be smaller
+            plt.rcParams.update({'font.size': 7})
+
             # Create confusion matrix
             # transformed labels
             lab = test_loader.dataset.le.transform(test_loader.dataset.le.classes_)
-            matrix = confusion_matrix(y_true_total, y_pred_total, labels=lab)
+            matrix = confusion_matrix(y_true_total, y_pred_total, labels=lab, normalize="all")
             disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
-            disp.plot(include_values=False)
-            plt.xticks(rotation=90)
+            disp.plot(include_values=False, xticks_rotation="vertical")
+            #plt.xticks(rotation=90)
             plt.tight_layout()
-            plt.title(f'test inference on test')
+            if not args.eval_train:
+                plt.title(f'test inference on test (normalized on all)')
+            else:
+                plt.title(f'inference on train (normalized on all)')
             plt.show()
-            plt.savefig(os.path.join(viz_dir, f'test_inference.jpg'))
+            if not args.eval_train:
+                plt.savefig(os.path.join(viz_dir, f'test_inference_normalize_all.jpg'))
+            else:
+                plt.savefig(os.path.join(viz_dir, f'train_inference_normalize_all.jpg'))
+
+            # Normalized over true
+            matrix = confusion_matrix(y_true_total, y_pred_total, labels=lab, normalize="true")
+            disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
+            disp.plot(include_values=False, xticks_rotation="vertical")
+            #plt.xticks(rotation=90)
+            plt.tight_layout()
+            if not args.eval_train:
+                plt.title(f'test inference on test (normalized on true labels)')
+            else:
+                plt.title(f'inference on train (normalized on true labels)')
+            plt.show()
+            if not args.eval_train:
+                plt.savefig(os.path.join(viz_dir, f'test_inference_normalize_true.jpg'))
+            else:
+                plt.savefig(os.path.join(viz_dir, f'train_inference_normalize_true.jpg'))
+
+            # Normalized over pred
+            matrix = confusion_matrix(y_true_total, y_pred_total, labels=lab, normalize="pred")
+            disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
+            disp.plot(include_values=False, xticks_rotation="vertical")
+            #plt.xticks(rotation=90)
+            plt.tight_layout()
+            if not args.eval_train:
+                plt.title(f'test inference on test (normalized on predictions)')
+            else:
+                plt.title(f'inference on train (normalized on predictions)')
+            plt.show()
+            if not args.eval_train:
+                plt.savefig(os.path.join(viz_dir, f'test_inference_normalize_pred.jpg'))
+            else:
+                plt.savefig(os.path.join(viz_dir, f'train_inference_normalize_pred.jpg'))
             plt.close()
 
         #logger.log_testing(np.mean(reduced_loss_), epoch)
@@ -154,6 +200,7 @@ def test_model(args, visualization=True):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--eval_train', action='store_true', help='Run inference on train set instead of test')
     parser.add_argument('--input_size', type=int, default=224)
     parser.add_argument('--crop_fusion_type', type=str, default='avg',
                         choices=['avg', 'max', 'topk'])
