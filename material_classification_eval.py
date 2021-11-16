@@ -74,8 +74,10 @@ def test_model(args, visualization=True):
 
     if args.eval_train:
         loader = train_loader
+        label_encoder = train_loader.dataset.le
     else:
         loader = test_loader
+        label_encoder = test_loader.dataset.le
 
     # Need the number of classes when initialize model
     model = MaterialClassificationNet(len(train_loader.dataset.classes))
@@ -128,12 +130,42 @@ def test_model(args, visualization=True):
             if not math.isnan(reduced_loss):
                 print("Test loss iter:{} {:.6f} ".format(i, reduced_loss))
 
-        # Total correct
+        # Total correct and class breakdown
+        class_counts = {} # key is class, value is total number of examples for that class (true label)
+        breakdown = {} # key is class, value is correct predictions that match this class
         total_correct = 0
         for k in range(len(y_true_total)):
+            true_label = y_true_total[k]
+            if true_label not in class_counts:
+                class_counts[true_label] = 1
+            else:
+                class_counts[true_label] += 1
+
+            if true_label not in breakdown:
+                breakdown[true_label] = 0
+
             if y_true_total[k] == y_pred_total[k]:
                 total_correct += 1
+                breakdown[true_label] += 1
         print(f"Total correct percent: {total_correct / len(y_true_total)}")
+        
+        # Calculate correct percentage for each class
+        keys = []
+        percentages = []
+        for key in class_counts:
+            keys.append(key)
+            per = breakdown[key] / class_counts[key]
+            percentages.append(per)
+
+        # Find top 10 worst classes
+        keys = np.array(keys)
+        percentages = np.array(percentages)
+        sort_indices = np.argsort(percentages)
+
+        for p in range(len(keys)):
+            real_key = label_encoder.inverse_transform([int(keys[sort_indices][p])])[0]
+            percent = percentages[sort_indices][p]
+            print(f"key: {real_key} and correct percentage: {percent}")
 
         if visualization:
             viz_dir = os.path.join(config.save_dir, "inference_viz")
