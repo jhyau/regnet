@@ -42,7 +42,7 @@ def prepare_dataloaders(args):
     train_loader = DataLoader(trainset, num_workers=0, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
                               drop_last=True)
-    test_loader = DataLoader(valset, num_workers=0, shuffle=False,
+    test_loader = DataLoader(valset, num_workers=0, shuffle=True,
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
@@ -89,9 +89,6 @@ def test_model(args, visualization=True):
         y_pred_total = []
 
         for i, batch in enumerate(test_loader):
-            y_true = []
-            y_pred = []
-
             model.parse_batch(batch)
             model.forward()
 
@@ -116,11 +113,11 @@ def test_model(args, visualization=True):
             correct = 0
             assert(len(preds) == len(model.labels.tolist()))
 
-            for j in range(len(model.labels.tolis())):
+            for j in range(len(model.labels.tolist())):
                 if preds[j] == model.labels.tolist()[j]:
                     correct += 1
 
-            correct_percent = correct / len(y_true)
+            correct_percent = correct / len(model.labels.tolist())
             print(f"Percent correctly classified for iter {i}: {correct_percent}")
 
             if not math.isnan(reduced_loss):
@@ -128,7 +125,7 @@ def test_model(args, visualization=True):
 
         # Total correct
         total_correct = 0
-        for k in range(y_true_total):
+        for k in range(len(y_true_total)):
             if y_true_total[k] == y_pred_total[k]:
                 total_correct += 1
         print(f"Total correct percent: {total_correct / len(y_true_total)}")
@@ -140,10 +137,11 @@ def test_model(args, visualization=True):
             # Create confusion matrix
             # transformed labels
             lab = test_loader.dataset.le.transform(test_loader.dataset.le.classes_)
-            matrix = confusion_matrix(y_true, y_pred, labels=lab)
+            matrix = confusion_matrix(y_true_total, y_pred_total, labels=lab)
             disp = ConfusionMatrixDisplay(confusion_matrix=matrix, display_labels=test_loader.dataset.le.classes_)
             disp.plot(include_values=False)
             plt.xticks(rotation=90)
+            plt.tight_layout()
             plt.title(f'test inference on test')
             plt.show()
             plt.savefig(os.path.join(viz_dir, f'test_inference.jpg'))
