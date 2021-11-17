@@ -138,6 +138,18 @@ class TSNDataSet(torch.utils.data.Dataset):
             x_img = Image.open(os.path.join(directory, self.image_tmpl.format('x', idx))).convert('L')
             y_img = Image.open(os.path.join(directory, self.image_tmpl.format('y', idx))).convert('L')
             return [x_img, y_img]
+    
+    def get_mel(self, filename):
+        melspec = np.load(filename)
+        #print(f"melspec shape: {melspec.shape}, num  of mel samples: {self.mel_samples}")
+        if melspec.shape[1] < self.mel_samples:
+            melspec_padded = np.zeros((melspec.shape[0], self.mel_samples))
+            melspec_padded[:, 0:melspec.shape[1]] = melspec
+        else:
+            melspec_padded = melspec[:, 0:self.mel_samples]
+        melspec_padded = torch.from_numpy(melspec_padded).float()
+        return melspec_padded
+
 
     def _get_modal_feature(self, video_name):
         modal_path = os.path.join(config.modal_features_dir, video_name+"_"+config.load_modal_data_type+".npy")
@@ -147,6 +159,7 @@ class TSNDataSet(torch.utils.data.Dataset):
         return feat
 
     def __getitem__(self, index):
+        video_id = self.video_list[index]
         video_path = os.path.join(self.root_path, self.video_list[index])
         images_rgb = list()
         images_flow = list()
@@ -179,8 +192,13 @@ class TSNDataSet(torch.utils.data.Dataset):
         process_data_rgb = self.transform(images_rgb)
         process_data_flow = self.transform(images_flow)
 
-        # Get the corresponding ground truth frequency
-        feat = self._get_modal_feature(self.video_list[index])
+        if config.pred_type == 'freq':
+            # Get the corresponding ground truth frequency
+            feat = self._get_modal_feature(self.video_list[index])
+        elif config.pred_type == 'mel_spec':
+            mel_path = os.path.join(config.mel_dir, video_id+"_mel.npy")
+            feat = self.get_mel(mel_path)
+
         return (process_data_rgb, process_data_flow, feat, video_path)
 
     def __len__(self):

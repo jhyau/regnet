@@ -985,6 +985,11 @@ class Regnet(nn.Module):
         self.netG = init_net(Regnet_G(extra_upsampling), self.device)
         self.netD = init_net(Regnet_D(extra_upsampling, visual_encoder_input=config.visual_encoder_input), self.device)
 
+        # If wanting to train/finetune the feature extractor
+        if config.train_visual_feature_extractor:
+            self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout)
+            self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout)
+
         # Set to pairing loss
         if config.pairing_loss:
             self.criterionGAN = TemporalAlignmentLoss().to(self.device)
@@ -1017,6 +1022,12 @@ class Regnet(nn.Module):
         self.real_B = mel.to(self.device).float()
         self.video_name = video_name
         #print(f'input size: {self.real_A.shape}, real mel-spec size: {self.real_B.shape}')
+
+    def parse_batch_train_visual_feat_extractor(self, batch):
+        raw_rgb, raw_flow, mel, video_name = batch
+        self.inputs = (raw_rgb.to(self.device).float(), raw_flow.float())
+        self.real_B = mel.to(self.device).float()
+        self.video_name = video_name
 
     def parse_batch_pairing_loss(self, batch):
         """Use this function to parse in the batch of examples based on pairing loss"""
@@ -1077,6 +1088,25 @@ class Regnet(nn.Module):
 
 
     def forward(self):
+        if config.train_visual_feature_extractor:
+            rgb, flow = self.inputs
+
+            # Extract RGB feautures
+            print(f"input rgb shape: {rgb.shape} and flow shape: {flow.shape}")
+            rgb_input_var = torch.autograd.Variable(rgb.view(rgb.size(0), -1, 3, rgb.size(2), rgb.size(3)))
+            rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
+            print(f"RGB feature shape: {rgb_feat.shape}")
+
+            # Extract flow features
+            flow_input_var = torch.autograd.Variable(flow.view(flow.size(0), -1, 2, flow.size(2), flow.size(3)))
+            flow_feat = torch.squeeze(self.flow_visual_feat_extractor(flow_input_var))
+
+            # Concatenate
+            feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
+            feature = torch.cat((rgb_feat, flow_feat), -1) # Concatenate along the last dimension
+            self.real_A = torch.FloatTensor(feature.astype(np.float32))
+            
+
         self.fake_B, self.fake_B_postnet, self.encoder_output = self.netG(self.real_A, self.real_B)
         #print(f'audio prediction size: {self.fake_B.shape}, postnet output shape: {self.fake_B_postnet.shape}')
 
