@@ -7,6 +7,7 @@ import time
 
 import torch
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from collections import defaultdict
 from torch import nn
 from torch.utils.data import DataLoader
 import numpy as np
@@ -79,6 +80,8 @@ def test_model(args, visualization=True):
         loader = test_loader
         label_encoder = test_loader.dataset.le
 
+    print(f"Total number of classes: {len(label_encoder.classes_)}")
+
     # Need the number of classes when initialize model
     model = MaterialClassificationNet(len(train_loader.dataset.classes))
     if config.checkpoint_path != '':
@@ -123,23 +126,35 @@ def test_model(args, visualization=True):
             for j in range(len(model.labels.tolist())):
                 if preds[j] == model.labels.tolist()[j]:
                     correct += 1
+                else:
+                    # Incorrect inference, print out video name and frame index
+                    true_class = label_encoder.inverse_transform([model.labels.tolist()[j]])[0]
+                    pred = label_encoder.inverse_transform([preds[j]])[0]
+                    video_name = batch[2][j]
+                    frame_index = batch[-1][j]
+                    print(f"Misclassification!!!! gt: {true_class}, pred: {pred}, video: {video_name}, frame index: {frame_index}")
 
-            correct_percent = correct / len(model.labels.tolist())
-            print(f"Percent correctly classified for iter {i}: {correct_percent}")
+            #correct_percent = correct / len(model.labels.tolist())
+            #print(f"Percent correctly classified for iter {i}: {correct_percent}")
 
             if not math.isnan(reduced_loss):
                 print("Test loss iter:{} {:.6f} ".format(i, reduced_loss))
 
         # Total correct and class breakdown
+        class_errors = {} # key is class, value is dict mapping misclassified class, to frequency, of all incorrect predictions
         class_counts = {} # key is class, value is total number of examples for that class (true label)
         breakdown = {} # key is class, value is correct predictions that match this class
         total_correct = 0
         for k in range(len(y_true_total)):
             true_label = y_true_total[k]
+            real_true = label_encoder.inverse_transform([true_label])[0]
             if true_label not in class_counts:
                 class_counts[true_label] = 1
             else:
                 class_counts[true_label] += 1
+
+            if real_true not in class_errors:
+                class_errors[real_true] = defaultdict(int)
 
             if true_label not in breakdown:
                 breakdown[true_label] = 0
@@ -147,8 +162,13 @@ def test_model(args, visualization=True):
             if y_true_total[k] == y_pred_total[k]:
                 total_correct += 1
                 breakdown[true_label] += 1
+            else:
+                class_errors[real_true][y_pred_total[k]] += 1
+
+        print(f"Number of classes in test set: {len(breakdown.keys())}")
         print(f"Total correct percent: {total_correct / len(y_true_total)}")
-        
+        print(f"Num correct: {total_correct} out of total samples: {len(y_true_total)}")
+
         # Calculate correct percentage for each class
         keys = []
         percentages = []
@@ -165,7 +185,19 @@ def test_model(args, visualization=True):
         for p in range(len(keys)):
             real_key = label_encoder.inverse_transform([int(keys[sort_indices][p])])[0]
             percent = percentages[sort_indices][p]
-            print(f"key: {real_key} and correct percentage: {percent}")
+
+            # Num examples in this class
+            count = breakdown[keys[sort_indices][p]]
+            total = class_counts[keys[sort_indices][p]]
+            print(f"key: {real_key}, correct percentage: {percent}, for num correct {count} out of total samples: {total}")
+        
+            if class_errors[real_key]:
+                freq = class_errors[real_key]
+                for key in freq:
+                    per = freq[key] / total
+                    key_name = label_encoder.inverse_transform([key])[0]
+                    print(f"Misclassify {key_name}: {freq[key]} out of {total}, for {per} percent")
+
 
         if visualization:
             viz_dir = os.path.join(config.save_dir, "inference_viz")

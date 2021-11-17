@@ -497,7 +497,7 @@ class RegnetLoader(torch.utils.data.Dataset):
         feature = np.concatenate((im, flow), 1) # Visual dim=2048
 
         feature = torch.FloatTensor(feature.astype(np.float32))
-        return (feature, encoded, video_id)
+        return (feature, encoded, video_id, frame_index)
 
 
     def __len__(self):

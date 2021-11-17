@@ -112,11 +112,12 @@ class MaterialClassificationNet(nn.Module):
         self.n_iter = -1
 
     def parse_batch(self, batch):
-        inputs, labels, video_name = batch
+        inputs, labels, video_name, frame_index = batch
         #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
         self.inputs = inputs.to(self.device).float()
         self.labels = labels.to(self.device)
         self.video_name = video_name
+        self.frame_index = frame_index
 
     def forward(self):
         # Pass the input through the visual encoder and classifier model
