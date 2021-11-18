@@ -9,7 +9,7 @@ import torch
 from torch.utils.data import DataLoader
 import numpy as np
 from Recorder import Recorder
-from data_utils import RegnetLoader
+from data_utils import RegnetLoader, get_TSN_Data_set
 from logger import RegnetLogger
 from criterion import RegnetLoss
 from model import Regnet
@@ -38,10 +38,10 @@ def prepare_dataloaders(args):
         valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
-    train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
+    train_loader = DataLoader(trainset, num_workers=args.workers, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
                               drop_last=True)
-    test_loader = DataLoader(valset, num_workers=4, shuffle=False,
+    test_loader = DataLoader(valset, num_workers=args.workers, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
@@ -208,7 +208,7 @@ def train(args):
             if config.pairing_loss:
                 model.parse_batch_pairing_loss(batch)
             elif config.train_visual_feature_extractor:
-                model.parse_batch_train_visual_feat_extractor()
+                model.parse_batch_train_visual_feat_extractor(batch)
             else:
                 model.parse_batch(batch)
             

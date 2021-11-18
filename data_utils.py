@@ -141,12 +141,11 @@ class TSNDataSet(torch.utils.data.Dataset):
     
     def get_mel(self, filename):
         melspec = np.load(filename)
-        #print(f"melspec shape: {melspec.shape}, num  of mel samples: {self.mel_samples}")
-        if melspec.shape[1] < self.mel_samples:
-            melspec_padded = np.zeros((melspec.shape[0], self.mel_samples))
+        if melspec.shape[1] < config.mel_samples:
+            melspec_padded = np.zeros((melspec.shape[0], config.mel_samples))
             melspec_padded[:, 0:melspec.shape[1]] = melspec
         else:
-            melspec_padded = melspec[:, 0:self.mel_samples]
+            melspec_padded = melspec[:, 0:config.mel_samples]
         melspec_padded = torch.from_numpy(melspec_padded).float()
         return melspec_padded
 
