@@ -25,8 +25,17 @@ def prepare_dataloaders(args):
     # Get data, data loaders and collate function ready
     #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
-    trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
-    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+
+    if config.train_visual_feature_extractor:
+        print("Getting the images to be stacked...")
+        args.input_dir = config.optical_flow_dir
+        args.test_list = config.training_files #'./filelists/asmr_by_material_1hr_train.txt'
+        trainset = get_TSN_Data_set(args)
+        args.test_list = config.test_files  #'./filelists/asmr_by_material_1hr_test.txt'
+        valset = get_TSN_Data_set(args)
+    else:
+        trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+        valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
     train_loader = DataLoader(trainset, num_workers=4, shuffle=True,
@@ -36,6 +45,8 @@ def prepare_dataloaders(args):
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
+    print("Check number of val examples: ", len(valset))
+    print("Check number of val loader examples: ", len(test_loader))
     assert(len(trainset) > 0)
     assert(len(train_loader) > 0)
     return train_loader, test_loader
@@ -196,6 +207,8 @@ def train(args):
             # Use a different parse_batch and forward function if using pairing loss
             if config.pairing_loss:
                 model.parse_batch_pairing_loss(batch)
+            elif config.train_visual_feature_extractor:
+                model.parse_batch_train_visual_feat_extractor()
             else:
                 model.parse_batch(batch)
             
@@ -254,6 +267,17 @@ def train(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    # Args for BN-Inception set up for training feature extractor
+    parser.add_argument('-i', '--input_dir', type=str)
+    parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
+    parser.add_argument('-t', '--test_list', type=str)
+    parser.add_argument('--input_size', type=int, default=224)
+    parser.add_argument('--crop_fusion_type', type=str, default='avg',
+                        choices=['avg', 'max', 'topk'])
+    parser.add_argument('--dropout', type=float, default=0.7)
+    parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
+                        help='number of data loading workers (default: 4)')
+    parser.add_argument('--flow_prefix', type=str, default='')
     #parser.add_argument('--extra_upsampling', action='store_true', help='include flag to add extra upsampling layers in the decoder and discriminator to match 44100 audio sample rate')
     parser.add_argument('--no_adversarial_loss', dest='adversarial_loss', action='store_false', help='include this flag to set adversarial loss to False, so GAN loss will not be used')
     #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to concatenate skeletal landmark features to the feature vector')

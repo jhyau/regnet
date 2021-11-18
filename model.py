@@ -791,8 +791,8 @@ class Regnet_G(nn.Module):
 
         # If wanting to train/finetune the feature extractor
         if config.train_visual_feature_extractor:
-            self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout)
-            self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout)
+            self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout, model_path=config.bn_inception_file)
+            self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout, model_path=config.bn_inception_file)
 
     def forward(self, inputs, real_B):
         if self.mode_input == "vis_spec":
