@@ -60,12 +60,13 @@ _C.encoder_kernel_size = 5
 _C.encoder_n_convolutions = 3
 
 # Modal impulse prediction parameters
-_C.n_modal_frequencies = 256
+_C.n_modal_frequencies = 256 # Could possibly be reduced down to 64?
 _C.load_modal_data_type = "freqs_raw"
 _C.load_modal_data = True
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 _C.train_visual_feature_extractor = False
 _C.pred_type = "mel_spec" # or "freq"
+_C.visual_feature_extractor = 'bn-inception' # or 'resnet50'
 
 # Data loading parameters
 _C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images

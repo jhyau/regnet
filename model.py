@@ -574,9 +574,13 @@ class Frequency_Net(nn.Module):
     def __init__(self):
         super(Frequency_Net, self).__init__()
         if config.train_visual_feature_extractor:
-            self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout)
-            self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout)
-            self.visual_feat_extractor = VisualFeatureExtractorCNN()
+            if config.visual_feature_extractor == "bn-inception":
+                self.rgb_visual_feat_extractor = TSN("RGB", consensus_type=config.consensus_type, dropout=config.dropout, model_path=config.bn_inception_file)
+                self.flow_visual_feat_extractor = TSN("Flow", consensus_type=config.consensus_type, dropout=config.dropout, model_path=config.bn_inception_file)
+            elif config.visual_feature_extractor == 'resnet50':
+                self.visual_feat_extractor = VisualFeatureExtractorCNN()
+            else:
+                raise Exception("Unknown visual feature extractor")
         self.encoder = Encoder()
         self.decoder = Modal_Impulse_Decoder()
         if config.mode_input == "":
@@ -593,25 +597,44 @@ class Frequency_Net(nn.Module):
             vis_thr, spec_thr = 0, 1
         else:
             print(self.mode_input)
+        
         # If want to train visual feature extractor, pass raw images through extractor first
         if config.train_visual_feature_extractor:
             # Input needs to be rgb and optical flow stacked images
             rgb, flow = inputs
-            print(f"input rgb shape: {rgb.shape} and flow shape: {flow.shape}")
-            #rgb_input_var = torch.autograd.Variable(rgb.view(rgb.size(0), -1, 3, rgb.size(2), rgb.size(3)))
-            #rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
-            rgb_feat = self.visual_feat_extractor(rgb, 3)
-            print(f"RGB feature shape: {rgb_feat.shape}")
 
-            #flow_input_var = torch.autograd.Variable(flow.view(flow.size(0), -1, 2, flow.size(2), flow.size(3)))
-            #flow_feat = torch.squeeze(self.flow_visual_feat_extractor(flow_input_var))
-            #flow_feat = self.visual_feat_extractor(flow, 2) # TODO: optical flow needs a different feature extractor from resnet because these are gray-scale images
-            #feature = np.concatenate((rgb_feat, flow_feat), 1) # Visual dim=2048
-            #feature = torch.cat((rgb_feat, flow_feat), -1) # Concatenate along the last dimension
-            #inputs = torch.FloatTensor(rgb_feat.astype(np.float32))
-            inputs = rgb_feat
-            print(f"visual feature extracted shape: {inputs.shape}")
-            #inputs = self.visual_feat_extractor(inputs)
+            if config.visual_feature_extractor == 'bn-inception':
+                rgb_feat_list = []
+                # Iterate through 1 at a time
+                for i in range(rgb.shape[0]):
+                    rgb_input_var = torch.autograd.Variable(rgb[i,:,:,:].view(-1, 3, rgb.size(2), rgb.size(3)))
+                    rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
+                    rgb_feat_list.append(rgb_feat)
+                    #rgb_input_var.detach() # Release memory from gpu
+                # Stack them up
+                rgb_final_feat = torch.stack(rgb_feat_list, dim=0) # to create a batch again
+                print(f"RGB feature shape: {rgb_final_feat.shape}")
+
+                # Extract flow features
+                flow_feat_list = []
+                for i in range(flow.shape[0]):
+                    flow_input_var = torch.autograd.Variable(flow[i,:,:,:].view(-1, 2, flow.size(2), flow.size(3)))
+                    flow_feat = torch.squeeze(self.flow_visual_feat_extractor(flow_input_var))
+                    flow_feat_list.append(flow_feat)
+                    #flow_input_var.detach()
+                flow_final_feat = torch.stack(flow_feat_list, dim=0)
+                print(f"flow feature shape: {flow_final_feat.shape}")
+
+                # Concatenate
+                #feature = np.concatenate((rgb_final_feat, flow_final_feat), 1) # Visual dim=2048
+                feature = torch.cat((rgb_final_feat, flow_final_feat), -1) # Concatenate along the last dimension
+                inputs = torch.FloatTensor(feature.astype(np.float32))
+                #inputs = self.real_A
+                print(f"inputs shape before passing to encoder: {inputs.shape}")
+            else:
+                # If using resnet50
+                rgb_feat = self.visual_feat_extractor(rgb, 3)
+                inputs = rgb_feat
 
         # Pass the input through the visual encoder
         encoder_output = self.encoder(inputs * vis_thr)
@@ -812,6 +835,7 @@ class Regnet_G(nn.Module):
             rgb_feat_list = []
             # Iterate through 1 at a time
             for i in range(rgb.shape[0]):
+                print("rgb feat index: ", i)
                 rgb_input_var = torch.autograd.Variable(rgb[i,:,:,:].view(-1, 3, rgb.size(2), rgb.size(3)))
                 rgb_feat = torch.squeeze(self.rgb_visual_feat_extractor(rgb_input_var))
                 rgb_feat_list.append(rgb_feat)
