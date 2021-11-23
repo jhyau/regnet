@@ -421,8 +421,13 @@ class Modal_Impulse_Decoder(nn.Module):
         super(Modal_Impulse_Decoder, self).__init__()
         # Set up the decoder's convolution layers
         # Raw frequencies (1, 1, 256), raw gains: (1, 1, 256), raw dampings: (1, 256)
-        # Visual encoder output has shape (batch size, video_samples, visual dim)
+        # Visual encoder output has shape (batch size, video_samples, encoder_embedding_dim [2048])
         model = []
+        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=config.video_samples,
+            kernel_size=5, stride=2, padding=2, dilation=1)]
+        model += [nn.BatchNorm1d(config.video_samples)]
+        model += [nn.ReLU(True)]
+
         model += [nn.Conv1d(in_channels=config.video_samples, out_channels=config.video_samples,
             kernel_size=5, stride=2, padding=2, dilation=1)]
         model += [nn.BatchNorm1d(config.video_samples)]
@@ -637,8 +642,11 @@ class Frequency_Net(nn.Module):
                 inputs = rgb_feat
 
         # Pass the input through the visual encoder
+        print(f"input to encoder: {inputs.shape}")
         encoder_output = self.encoder(inputs * vis_thr)
+        print(f"encoder output: {encoder_output.shape}")
         self.decoder_output = self.decoder(encoder_output)
+        print(f"decoder output shape: {self.decoder_output.shape}")
         return self.decoder_output
 
 
