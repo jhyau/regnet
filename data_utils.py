@@ -78,9 +78,9 @@ class RegnetLoader(torch.utils.data.Dataset):
                 output.append(PairingLossPoint(feat_mis, mel_sub, video_id, 0))
                 output.append(PairingLossPoint(feat_sub, mel_mis, video_id, 0))
 
-        # Return a tuple of examples (each a tuple as well)
-        
-        return tuple(output)
+            # Return a tuple of examples (each a tuple as well)
+            
+            return tuple(output)
     
 
         if self.include_landmarks:

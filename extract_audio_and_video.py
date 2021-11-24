@@ -108,7 +108,10 @@ if __name__ == '__main__':
     sr = args.audio_sample_rate
     fps = args.video_fps
     
-    video_paths = glob(P.join(input_dir, "*.mp4"))
+    video_paths = []
+    for i in [299,74,253,192]:
+        video_paths.extend(glob(P.join(input_dir, "*%d*.mp4" % i)))
+    print(video_paths)
     video_paths.sort()
 
     with Pool(args.num_worker) as p:

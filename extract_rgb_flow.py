@@ -8,7 +8,7 @@ from functools import partial
 import numpy as np
 
 def cal_for_frames(video_path, output_dir, width, height):
-    save_dir = P.join(output_dir, P.basename(video_path).split('.')[0])
+    save_dir = P.join(output_dir, P.basename(video_path).rsplit('.', 1)[0])
     os.makedirs(save_dir, exist_ok=True)
     video = cv2.VideoCapture(video_path)
     _, prev = video.read()

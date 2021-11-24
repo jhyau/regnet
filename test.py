@@ -122,7 +122,8 @@ def test_model(args, config):
     torch.cuda.manual_seed(config.seed)
     # add extra_upsampling parameter
     model = Regnet(extra_upsampling=config.extra_upsampling)
-    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+    # No pairing loss loader in the test.
+    valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=False)
     test_loader = DataLoader(valset, num_workers=4, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
     if config.checkpoint_path != '':
@@ -135,7 +136,7 @@ def test_model(args, config):
     with torch.no_grad():
         os.makedirs(config.save_dir, exist_ok=True)
         with open(os.path.join(config.save_dir, 'mel_files.txt'), 'w') as file:
-            for i, batch in enumerate(test_loader):
+            for i, batch in tqdm(enumerate(test_loader)):
                 #if config.pairing_loss:
                 #    model.parse_batch_pairing_loss()
                 #    model.forward_pairing_loss()
@@ -246,8 +247,8 @@ def test_model(args, config):
                             gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
                         else:
                             print('For waveglow, run inference separately')
-                            #gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
-                            #gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
+                            gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
+                            gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
                     else:
                         if args.gt:
                             print("using ground truth melspectrograms for vocoder inference...")
@@ -261,7 +262,7 @@ def test_model(args, config):
                             gen_waveform(wavenet_model, save_path, mel_spec, device, args)
                         else:
                             print("Not immediately generating audio with waveglow")
-                            #gen_waveform_waveglow(args, save_path, mel_spec, device)
+                            gen_waveform_waveglow(args, save_path, mel_spec, device)
     model.train()
 
 if __name__ == '__main__':

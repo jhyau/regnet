@@ -179,6 +179,7 @@ if __name__ == '__main__':
     net = torch.nn.DataParallel(net).cuda()
     net.eval()
     for i, (data, video_path) in enumerate(data_loader):
+        print(video_path)
         os.makedirs(args.output_dir, exist_ok=True)
         ft_path = os.path.join(args.output_dir, video_path[0].split(os.sep)[-1]+".pkl")
         if args.modality == 'RGB' or args.modality == 'RGB_landmarks':

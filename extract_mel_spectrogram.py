@@ -9,6 +9,7 @@ from glob import glob
 sys.path.append('./waveglow')
 sys.path.append('./waveglow/tacotron2')
 print(sys.path)
+print(os.getcwd())
 
 from waveglow.mel2samp import files_to_list, load_wav_to_torch, TacotronSTFT, MAX_WAV_VALUE
 import torch
@@ -36,7 +37,7 @@ def get_spectrogram(audio_path, save_dir, length, mel_basis, mel_samples, args):
     mel_spec = mel_spec[:, :mel_samples]
     #print(f'wavenet melspectrogram shape: {mel_spec.shape}')
     os.makedirs(save_dir, exist_ok=True)
-    audio_name = os.path.basename(audio_path).split('.')[0]
+    audio_name = os.path.basename(audio_path).rsplit('.', 1)[0]
     print("writing out to: ", P.join(save_dir, audio_name + "_mel.npy"))
     np.save(P.join(save_dir, audio_name + "_mel.npy"), mel_spec)
     np.save(P.join(save_dir, audio_name + "_audio.npy"), y)
@@ -76,7 +77,7 @@ def get_spectrogram_waveglow(audio_path, save_dir, length, mel_samples, args):
     # Separate waveglow mel specs for now
     #save_dir = save_dir + '_waveglow_mels'
     os.makedirs(save_dir, exist_ok=True)
-    audio_name = os.path.basename(audio_path).split('.')[0]
+    audio_name = os.path.basename(audio_path).rsplit('.', 1)[0]
     np.save(P.join(save_dir, audio_name + "_mel.npy"), melspec)
     np.save(P.join(save_dir, audio_name + "_audio.npy"), y)
 
