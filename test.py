@@ -13,6 +13,9 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+import util.diff_util as du
+import util.peak_util as pu
+
 from wavenet_vocoder import builder
 # waveglow vocoder imports
 import json
@@ -23,6 +26,11 @@ from waveglow.denoiser import Denoiser
 from waveglow.mel2samp import files_to_list, MAX_WAV_VALUE
 from waveglow.train import load_checkpoint
 from waveglow.glow import WaveGlow, WaveGlowLoss
+
+# MAX_WAV_VALUE = 32768.0
+
+waveglow = None
+denoiser = None
 
 def build_wavenet(checkpoint_path=None, device='cuda:0'):
     model = builder.wavenet(
@@ -81,41 +89,118 @@ def gen_waveform_waveglow(args, save_path, c, device):
     #optimizer = torch.optim.Adam(model.parameters(), lr=train_config['learning_rate'])
     #waveglow, optimizer, iteration = load_checkpoint(args.waveglow_path, model, optimizer)
     print("generate with waveglow..")
-    waveglow = torch.load(args.waveglow_path)['model']
-    waveglow = waveglow.remove_weightnorm(waveglow)
-    waveglow.cuda().eval()
+    global waveglow
+    if waveglow is None:
+        # only setup the model once.
+        waveglow = torch.load(args.waveglow_path)['model']
+        waveglow = waveglow.remove_weightnorm(waveglow)
+        waveglow.cuda().eval()
 
-    if c.shape[1] != config.n_mel_channels:
-        c = np.swapaxes(c, 0, 1)
-    length = c.shape[0] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
-    print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
-    #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
+        #if c.shape[1] != config.n_mel_channels:
+        #    c = np.swapaxes(c, 0, 1)
+        # NOTE(coconutruben): unclear why we do this swap, and it might be throwing
+        # an error.
+        length = c.shape[1] * 256  # default: 860 * 256 = 220160, where mel_samples=860 and n_mel_channels=80. c is shape (860, 80) usually for 10 second prediction
+        print(f"first dim in c shape: {c.shape}, length of the waveform to be generated: {length}")
+        #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
 
-    # install apex if want to use amp
-    if args.is_fp16:
-        print("using apex for waveglow sound generation...")
-        from apex import amp
-        waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
-        #c = c.half()
+        # install apex if want to use amp
+        if args.is_fp16:
+            print("using apex for waveglow sound generation...")
+            from apex import amp
+            waveglow, _ = amp.initialize(waveglow, [], opt_level="O3")
+            #c = c.half()
 
-    if args.denoiser_strength > 0:
-        denoiser = Denoiser(waveglow).cuda()
+        if args.denoiser_strength > 0:
+            global denoiser
+            denoiser = Denoiser(waveglow).cuda()
 
-    mel = torch.autograd.Variable(c)
+    mel = torch.autograd.Variable(torch.from_numpy(c).cuda())
     mel = torch.unsqueeze(mel, 0)
     #c = torch.FloatTensor(c.T).unsqueeze(0).to(device)
     mel = mel.half() if args.is_fp16 else mel
-
+    
     with torch.no_grad():
         audio = waveglow.infer(mel, sigma=args.sigma)
         if args.denoiser_strength  > 0:
             audio = denoiser(audio, args.denoiser_strength)
-        #audio = audio * MAX_WAV_VALUE
+        audio = audio * MAX_WAV_VALUE
     audio = audio.squeeze()
     audio = audio.cpu().numpy()
     audio = audio.astype('int16')
     write(save_path, args.sampling_rate, audio)
     print(save_path)
+
+def visualize_results(outdir, videoname, pred_mel, gt_mel, postnet_mel, step_size, step, num_plots, suffix='.png'):
+    """visualize the outputs"""
+    h, w = gt_mel.shape
+
+    if step == -1:
+        # This means use the whole image
+        parts = ''
+        part_label = ''
+        start = 0
+        end = w
+    else:
+        start = int(step*step_size)
+        end = int(start + step_size)
+        parts = "_part{step+1}_of_{num_plots}.jpg"
+        part_label = "_predict_part" + str(step+1)
+
+    plt.figure(figsize=(8, 9))
+    plt.subplot(311)
+    # model.real_B is the ground truth spectrogram
+    if step == -1:
+        print(f"ground truth spec size: {gt_mel.shape}")
+        print(f"ground truth max: {np.max(gt_mel)} and min: {np.min(gt_mel)}")
+    plt.imshow(gt_mel[:,start:end], aspect='auto', origin='lower')
+    plt.title(videoname + "_ground_truth")
+    plt.subplot(312)
+    # model.fake_B is the generator's prediction
+    if step == -1:
+        print(f"prediction spec size: {pred_mel.shape}")
+        print(f'prediction max: {np.max(pred_mel)} and min: {np.min(pred_mel)}')
+    plt.imshow(pred_mel[:,start:end], aspect='auto', origin='lower')
+    plt.title(videoname + "_predict" + part_label)
+    plt.subplot(313)
+    # model.fake_B_postnet is the generator's postnet prediction
+    plt.imshow(postnet_mel[:,start:end], aspect='auto', origin='lower')
+    plt.title(videoname + "_postnet" + part_label)
+    plt.xlabel('Time')
+    plt.tight_layout()
+
+    # Make sure save directory exists
+    plt.savefig(os.path.join(outdir, videoname + parts + suffix))
+    plt.close()
+    # Print the visualization of peak locations.
+
+    plt.figure(figsize=(8, 9))
+    plt.subplot(311)
+    plt.imshow(gt_mel[:,start:end], aspect='auto', origin='lower')
+    plt.title(videoname + "_ground_truth" + part_label)
+    plt.subplot(312)
+
+    # Print the visualization of the diff
+    diff_img = du.diff_image(pred_mel, gt_mel)
+    plt.imshow(diff_img[:,start:end], aspect='auto', origin='lower')
+    plt.xlabel('Time(s)')
+    plt.ylabel('mel bucket intensity diff')
+    plt.title('diff of intensities. red: pred > gt. blue: gt > pred')
+    plt.subplot(313)
+    plt.imshow(pred_mel[:,start:end], aspect='auto', origin='lower')
+    plt.title(videoname + "_predict" + part_label)
+    plt.savefig(os.path.join(outdir, videoname + parts + '.diff' + suffix))
+    plt.close()
+    
+    _, pred_peaks = pu.count_peaks(pred_mel)
+    _, gt_peaks = pu.count_peaks(gt_mel)
+    peaks_img = pu.peaks_diff_image(pred_peaks, gt_peaks, h, w)
+    plt.imshow(peaks_img[:,start:end], aspect='auto', origin='lower')
+    plt.xlabel('Time(s)')
+    plt.ylabel('Peak/Impact (binary). upper: gt, lower: pred')
+    plt.savefig(os.path.join(outdir, videoname + parts + '.peaks' + suffix))
+    plt.close()
+
 
 def test_model(args, config):
     torch.manual_seed(config.seed)
@@ -133,6 +218,8 @@ def test_model(args, config):
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     wavenet_model = build_wavenet(config.wavenet_path, device) 
+    num_plots = args.num_plots
+    step_size = config.mel_samples / num_plots
     with torch.no_grad():
         os.makedirs(config.save_dir, exist_ok=True)
         with open(os.path.join(config.save_dir, 'mel_files.txt'), 'w') as file:
@@ -145,117 +232,61 @@ def test_model(args, config):
                 for j in range(len(model.fake_B)):
                     plt.figure(figsize=(8, 9))
                     plt.subplot(311)
-                    # model.real_B is the ground truth spectrogram
-                    print(f"ground truth spec size: {model.real_B[j].data.cpu().numpy().shape}")
-                    print(f"ground truth max: {np.max(model.real_B[j].data.cpu().numpy())} and min: {np.min(model.real_B[j].data.cpu().numpy())}")
-                    plt.imshow(model.real_B[j].data.cpu().numpy(), 
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_ground_truth")
-                    plt.subplot(312)
-                    # model.fake_B is the generator's prediction
-                    print(f"prediction spec size: {model.fake_B[j].data.cpu().numpy().shape}")
-                    print(f'prediction max: {np.max(model.fake_B[j].data.cpu().numpy())} and min: {np.min(model.fake_B[j].data.cpu().numpy())}')
-                    plt.imshow(model.fake_B[j].data.cpu().numpy(), 
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_predict")
-                    plt.subplot(313)
-                    # model.fake_B_postnet is the generator's postnet prediction
-                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_postnet")
-                    plt.xlabel('Time')
-                    plt.tight_layout()
-
-                    # Make sure save directory exists
+                    pred_mel = model.fake_B[j].data.cpu().numpy()
+                    gt_mel = model.real_B[j].data.cpu().numpy()
+                    postnet_mel = model.fake_B_postnet[j].data.cpu().numpy()
+                    vname = model.video_name[j]
                     os.makedirs(config.save_dir, exist_ok=True)
-                    plt.savefig(os.path.join(config.save_dir, model.video_name[j]+".jpg"))
-                    plt.close()
-
+                    visualize_results(config.save_dir, vname, pred_mel, gt_mel, postnet_mel, step_size, -1, num_plots)
                     # Save a zoomed-in plot so time dim is stretched out
                     # Assuming the sample is 10 seconds, split to parts of 2 seconds
-                    num_plots = args.num_plots
-                    step_size = config.mel_samples / num_plots
+                    subdir = os.path.join(config.save_dir, vname + '.subplots')
+                    # Move all cuts of plots to be in their own subdirectories
+                    os.makedirs(subdir, exist_ok=True)
                     for step in range(num_plots):
-                        #print(f"Starting time dim: {step*step_size}, ending time dim: {step_size*(step+1)}")
-                        plt.figure(figsize=(8,9))
-                        #extent = [step*step_size, step_size*(step+1), min(model.real_B[j].data.cpu().numpy().any()), max(model.real_B[j].data.cpu().numpy().any())]
-                        extent = [step*step_size, step_size*(step+1), 0, model.real_B[j].data.cpu().numpy().shape[0]] # For imshow of (m,n) array, image is m rows and n columns
-                        plt.subplot(311)
-                        if step == num_plots-1:
-                            plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):],
-                                    aspect='auto', origin='lower', extent=extent)
-                        else:
-                            plt.imshow(model.real_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
-                                    aspect='auto', origin='lower', extent=extent)
-                        plt.title(model.video_name[j]+"_ground_truth_part"+str(step))
-
-                        plt.subplot(312)
-                        #extent = [step*step_size, step_size*(step+1), min(model.fake_B[j].data.cpu().numpy().any()), max(model.fake_B[j].data.cpu().numpy().any())]
-                        extent = [step*step_size, step_size*(step+1), 0, model.fake_B[j].data.cpu().numpy().shape[0]]
-                        if step == num_plots-1:
-                            plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):],
-                                    aspect='auto', origin='lower', extent=extent)
-                        else:
-                            plt.imshow(model.fake_B[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
-                                    aspect='auto', origin='lower', extent=extent)
-                        plt.title(model.video_name[j]+"_predict_part"+str(step))
-
-                        plt.subplot(313)
-                        #extent = [step*step_size, step_size*(step+1), min(model.fake_B_postnet[j].data.cpu().numpy().any()), max(model.fake_B_postnet[j].data.cpu().numpy().any())]
-                        extent = [step*step_size, step_size*(step+1), 0, model.fake_B_postnet[j].data.cpu().numpy().shape[0]]
-                        if step == num_plots-1:
-                            plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):],
-                                    aspect='auto', origin='lower', extent=extent)
-                        else:
-                            plt.imshow(model.fake_B_postnet[j].data.cpu().numpy()[:,int(step*step_size):int(step_size*(step+1))],
-                                    aspect='auto', origin='lower', extent=extent)
-                        plt.title(model.video_name[j]+"_postnet_part"+str(step))
-                        plt.xlabel('Time')
-                        plt.tight_layout()
-                        plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}_of_{num_plots}.jpg"))
-                        plt.close()
+                        visualize_results(config.save_dir, vname, pred_mel, gt_mel, postnet_mel, step_size, step, num_plots)
 
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
                     
                     # Saving the model prediction mel spec as numpy file
                     np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
-                              model.fake_B[j].data.cpu().numpy())
+                              pred_mel)
                     # Save ground truth as well
                     np.save(os.path.join(config.save_dir, model.video_name[j]+"_gt.npy"),
-                            model.real_B[j].data.cpu().numpy())
+                            gt_mel)
                     # Save postnet prediction
                     #np.save(os.path.join(config.save_dir, model.video_name[j]+"_postnet.npy"),
-                    #        model.fake_B_postnet[j].data.cpu().numpy())
+                    #        postnet_mel)
                     # Using the prediction mel spectrogram to generate sound
                     if args.gt:
                         print("using ground truth melspectrograms for vocoder inference...")
-                        mel_spec = model.real_B[j].data.cpu().numpy()
+                        mel_spec = gt_mel
                         save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
                     else:
-                        mel_spec = model.fake_B[j].data.cpu().numpy()
+                        mel_spec = pred_mel
                         save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
 
                     if args.gt_and_pred:
-                        mel_spec_gt = model.real_B[j].data.cpu().numpy()
+                        mel_spec_gt = gt_mel
                         save_path_gt = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
-                        mel_spec_pred = model.fake_B[j].data.cpu().numpy()
+                        mel_spec_pred = pred_mel
                         save_path_pred = os.path.join(config.save_dir, model.video_name[j]+".wav")
 
                         if args.vocoder == 'wavenet':
                             gen_waveform(wavenet_model, save_path_gt, mel_spec_gt, device, args)
                             gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
                         else:
-                            print('For waveglow, run inference separately')
+                            # print('For waveglow, run inference separately')
                             gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
                             gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
                     else:
                         if args.gt:
                             print("using ground truth melspectrograms for vocoder inference...")
-                            mel_spec = model.real_B[j].data.cpu().numpy()
+                            mel_spec = gt_mel
                             save_path = os.path.join(config.save_dir, model.video_name[j]+"_gt.wav")
                         else:
-                            mel_spec = model.fake_B[j].data.cpu().numpy()
+                            mel_spec = pred_mel
                             save_path = os.path.join(config.save_dir, model.video_name[j]+".wav")
 
                         if args.vocoder == 'wavenet':
@@ -270,13 +301,13 @@ if __name__ == '__main__':
     parser.add_argument('--vocoder', type=str, default='waveglow', help='Vocoder to use. waveglow or wavenet')
     parser.add_argument('-c', '--config_file', type=str, default='',
                         help='file for configuration')
-    parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/published_ver/waveglow_256channels_universal_v5.pt', help='The path to waveglow checkpoint to load. Currently default is set to Waveglow published weights')
+    parser.add_argument('--waveglow_path', type=str, default='/juno/group/SoundProject/WaveGlowWeights/TrainAll/checkpoints/waveglow_152500', help='The path to waveglow checkpoint to load. Currently default is set to Waveglow published weights')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
-    parser.add_argument('--sigma', default=2.0, type=float)
+    parser.add_argument('--sigma', default=1.0, type=float)
     parser.add_argument('--sampling_rate', default=22050, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
-    parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
-    parser.add_argument('--num_plots', default=35, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
+    parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow', default=True)
+    parser.add_argument('--num_plots', default=10, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
     parser.add_argument('--gt', action='store_true', help='generate only ground truth audio')
     parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio')
     #parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')

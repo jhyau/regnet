@@ -97,3 +97,5 @@ _C.niter = 100
 _C.D_interval = 1
 _C.wo_G_GAN = True # Flag on whether to use GAN loss(or GAN setup in our case) or not
 _C.wavenet_path = ""
+# waveglow checkpoint path. Used only during test.
+_C.waveglow_path = "/juno/group/SoundProject/WaveGlowWeights/TrainAll/checkpoints/waveglow_152500"

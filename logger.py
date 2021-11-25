@@ -14,6 +14,7 @@ class RegnetLogger(SummaryWriter):
         self.add_scalar("training.loss_G", model.loss_G, iteration)
         self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
         self.add_scalar("training.peaks_delta", model.peaks_delta, iteration)
+        self.add_scalar("training.peaks_offset", model.peaks_offset, iteration)
 
         #if not self.exclude_gan_loss:
         #    self.add_scalar("training.loss_G_GAN", model.loss_G_GAN, iteration)
@@ -30,8 +31,10 @@ class RegnetLogger(SummaryWriter):
             self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
         self.add_scalar("duration", duration, iteration)
 
-    def log_testing(self, reduced_loss, epoch):
+    def log_testing(self, reduced_loss, model, epoch):
         self.add_scalar("testing.loss", reduced_loss, epoch)
+        self.add_scalar("testing.peaks_delta", model.peaks_delta, epoch)
+        self.add_scalar("testing.peaks_offset", model.peaks_offset, epoch)
 
     def log_plot(self, model, iteration, split="train"):
         output = model.fake_B

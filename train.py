@@ -21,8 +21,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
-import util.peak_counter as pc
-
 def prepare_dataloaders(args):
     # Get data, data loaders and collate function ready
     #trainset = RegnetLoader(config.training_files, include_landmarks=args.include_landmarks)
@@ -50,8 +48,6 @@ def visualize(_plt, mel, plotid, tag):
     _plt.subplot(911+plotid)
     _plt.imshow(mel, aspect='auto', origin='lower')
     h,w = mel.shape
-    #mel_peaks = pc.get_im_overlay(pc.count_peaks(mel)[1], w, h)
-    #_plt.imshow(mel, aspect='auto', origin='lower', cmap='Reds')
     _plt.title(tag)
 
 def test_model(model, criterion, test_loader, epoch, logger, visualization=False):
@@ -140,7 +136,7 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):
                 print("Test loss epoch:{} iter:{} {:.6f} ".format(epoch, i, reduced_loss))
-        logger.log_testing(np.mean(reduced_loss_), epoch)
+        logger.log_testing(np.mean(reduced_loss_), model, epoch)
     model.train()
     return np.mean(reduced_loss_) # Return the average of loss over test set
 

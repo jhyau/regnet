@@ -3,7 +3,7 @@ import math
 import os
 
 import numpy as np
-import util.peak_counter as pc
+import util.peak_util as pu
 
 import torch
 from torch import nn
@@ -602,12 +602,26 @@ class Regnet(nn.Module):
         mels = np.vstack([self.real_B_cen.detach().cpu().numpy(),
                           self.real_B_back.detach().cpu().numpy(),
                           self.real_B_for.detach().cpu().numpy()])
-        pred_peaks = np.array([pc.count_peaks(p)[0] for p in pred_mels])
-        peaks = np.array([pc.count_peaks(p)[0] for p in mels])
-        self.peaks_delta = np.abs(np.mean(pred_peaks-peaks))
-        # print('On average there was a %f peak discrepancy between pred and gt' %
-        #        self.peaks_delta)
-        #print(f"Output generated shape: {self.fake_B_cen.shape} and {self.fake_B_cen_postnet.shape}") 
+        pred_peaks_info = [pu.count_peaks(p) for p in pred_mels]
+        peaks_info = [pu.count_peaks(p) for p in mels]
+        pred_peaks_count = np.array([p[0] for p in pred_peaks_info])
+        peaks_count = np.array([p[0] for p in peaks_info])
+        # use mask to make sure that only examples where counting was successful
+        # are actually used.
+        mask = pred_peaks_count != 0
+        self.peaks_delta = np.mean(np.abs(pred_peaks_count[mask] - peaks_count[mask]))
+        # Now, let's also find the avg distance from a predicted peak, to a
+        # neighboring peak
+        pred_peaks = [pred_peaks_info[idx][1] for idx in np.arange(len(peaks_info)) if mask[idx]]
+        peaks = [peaks_info[idx][1] for idx in np.arange(len(peaks_info)) if mask[idx]]
+        avg_distance = np.zeros(len(peaks))
+        for i in np.arange(len(peaks)):
+            dist = np.abs(peaks[i][:,None] - pred_peaks[i][None,:])
+            # along axis=0 to make sure we're counting avg distance of a
+            # predicted peak to the gt peaks.
+            mdist = np.argmin(dist, axis=0)
+            avg_distance[i] = np.mean(mdist)
+        self.peaks_offset = np.mean(avg_distance)
 
     def get_scheduler(self, optimizer, config):
         def lambda_rule(epoch):
