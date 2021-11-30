@@ -234,10 +234,7 @@ class RegnetLoader(torch.utils.data.Dataset):
             self.video_ids = [line.strip() for line in f]
         #print("Video IDs of dataset: ", self.video_ids)
 
-        if config.classification and self.per_frame: 
-            # Get the labels (all classes) for classification task
-            self.le = preprocessing.LabelEncoder()
-            self.classes = set()
+        if self.per_frame:
             self.total_len = 0
 
             # Get total number of examples
@@ -246,12 +243,18 @@ class RegnetLoader(torch.utils.data.Dataset):
                 num_frames_rgb = len(glob(os.path.join(video_path, "img*.jpg"))) - len(glob(os.path.join(video_path, "img*_landmarks.jpg")))
                 num_frames_flow = len(glob(os.path.join(video_path, "flow_x*.jpg")))
                 assert(num_frames_rgb == num_frames_flow)
-                
+
                 # If want only a subset of frames from each video
                 if config.video_samples < num_frames_flow:
                     self.total_len += config.video_samples
                 else:
                     self.total_len += num_frames_flow
+
+        if config.classification: 
+            # Get the labels (all classes) for classification task
+            self.le = preprocessing.LabelEncoder()
+            self.classes = set()
+            self.total_len = 0
 
             # Get all possible classes
             self.get_all_material_classes()
@@ -485,14 +488,18 @@ class RegnetLoader(torch.utils.data.Dataset):
         # <video_name>-[label-label]-<num>-of-<num>
         start_index = 1
         end_index = -4
-        label_tokens = tokens[start_index:(end_index+1)]
-        label = ""
-        for tok in label_tokens:
-            # Count the labels with 2 as duplicates (for now)
-            if not tok.isdigit():
-                label += tok + " "
 
-        return label.strip()
+        # To generalize material of the same class (e.g. ceramic-plate and ceramic are same label)
+        return tokens[start_index]
+
+        #label_tokens = tokens[start_index:(end_index+1)]
+        #label = ""
+        #for tok in label_tokens:
+            # Count the labels with 2 as duplicates (for now)
+        #    if not tok.isdigit():
+        #        label += tok + " "
+
+        #return label.strip()
 
     def __get_frames__(self, vid_id, frame_index):
         """

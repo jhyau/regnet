@@ -641,6 +641,7 @@ class Frequency_Net(nn.Module):
                 rgb_feat = self.visual_feat_extractor(rgb, 3)
                 inputs = rgb_feat
 
+        # For pre-extracted features, can directly pass through the encoder
         # Pass the input through the visual encoder
         print(f"input to encoder: {inputs.shape}")
         encoder_output = self.encoder(inputs * vis_thr)
