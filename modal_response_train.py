@@ -28,10 +28,8 @@ def prepare_dataloaders(args):
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
     if config.train_visual_feature_extractor:
         print("Getting the images to be stacked...")
-        args.test_list = './filelists/asmr_by_material_1hr_train.txt' 
-        trainset = get_TSN_Data_set(args)
-        args.test_list = './filelists/asmr_by_material_1hr_test.txt'
-        valset = get_TSN_Data_set(args) 
+        trainset = get_TSN_Data_set(args, 'train')
+        valset = get_TSN_Data_set(args, 'val') 
     else:
         trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
         valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)

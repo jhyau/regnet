@@ -29,23 +29,26 @@ def prepare_dataloaders(args):
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
     if config.train_visual_feature_extractor:
         print("Getting the images to be stacked...")
-        args.test_list = './filelists/asmr_by_material_1hr_train.txt' 
-        trainset = get_TSN_Data_set(args)
-        args.test_list = './filelists/asmr_by_material_1hr_test.txt'
-        valset = get_TSN_Data_set(args) 
+        trainset = get_TSN_Data_set(args, 'train')
+        valset = get_TSN_Data_set(args, 'val') 
     else:
+        print('Loading preprocessed features from frozen BN-Inception...')
         trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
         valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
+    print('test: ', trainset.__len__())
+    print("Check number of train examples: ", len(trainset))
+    print("Check number of val examples: ", len(valset))
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
     # Originally, num_workers is set to 4 (seems to go out of memory when loading raw images)
     train_loader = DataLoader(trainset, num_workers=0, shuffle=True,
                               batch_size=config.batch_size, pin_memory=False,
                               drop_last=True)
+
     test_loader = DataLoader(valset, num_workers=0, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
-    print("Check number of train examples: ", len(trainset))
     print("Check number of train loader examples: ", len(train_loader))
+    print("Check number of test loader examples: ", len(test_loader))
     assert(len(trainset) > 0)
     assert(len(train_loader) > 0)
     return train_loader, test_loader

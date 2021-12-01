@@ -67,7 +67,7 @@ class ToTorchFormatTensor(object):
         return img.float().div(255) if self.div else img.float()
 
 
-def get_TSN_Data_set(args):
+def get_TSN_Data_set(args, dataset_type):
     if args.modality == 'RGB':
         image_tmpl="img_{:05d}.jpg"
     elif args.modality == 'RGB_landmarks':
@@ -93,7 +93,13 @@ def get_TSN_Data_set(args):
     #        batch_size=1, shuffle=False,
     #        num_workers=1, pin_memory=True)
     print(f"Input dir: {args.input_dir}")
-    print(f"Test list: {args.test_list}")
+
+    if dataset_type == 'train':
+        data_list = config.training_files
+    elif dataset_type == 'val':
+        data_list = config.test_files
+
+    print(f"Test list: {data_list}")
 
     # BN-Inception mean and std
     input_mean = [104, 117, 128]
@@ -101,7 +107,7 @@ def get_TSN_Data_set(args):
     #input_mean = [0.485, 0.456, 0.406]
     #input_std = [0.229, 0.224, 0.225]
 
-    return TSNDataSet(args.input_dir, args.test_list,
+    return TSNDataSet(args.input_dir, data_list,
                     modality=args.modality,
                     image_tmpl="img_{:05d}.jpg" if args.modality == 'RGB' else args.flow_prefix+"flow_{}_{:05d}.jpg",
                     #image_tmpl=image_tmpl,
@@ -249,16 +255,17 @@ class RegnetLoader(torch.utils.data.Dataset):
                     self.total_len += config.video_samples
                 else:
                     self.total_len += num_frames_flow
+            print("Total num frames: ", self.total_len)
 
         if config.classification: 
             # Get the labels (all classes) for classification task
             self.le = preprocessing.LabelEncoder()
             self.classes = set()
-            self.total_len = 0
 
             # Get all possible classes
             self.get_all_material_classes()
             assert(len(self.classes) > 0)
+            print(self.classes)
 
             # Use label encoder
             self.classes = list(self.classes) # Convert from set to list
