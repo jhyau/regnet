@@ -26,7 +26,7 @@ if __name__ == '__main__':
         n_test = 2
     elif args.prefix in ["ASMR_1_Hr"]:
         n_test = 64
-    elif args.prefix in ["ASMR_3_Hrs"]:
+    elif args.prefix in ["ASMR_3_Hrs", "asmr_by_material_clips"]:
         n_test = 128
     elif args.prefix in ["ASMR"]:
         n_test = 100
@@ -40,17 +40,15 @@ if __name__ == '__main__':
             f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
     f.close()
 
-    with open(P.join(output_dir, args.prefix+"_test.txt"), 'w') as f:
-        #for video_path in video_paths[-n_test:int(-n_test/2)]:
-        for video_path in video_paths[-n_test:]:
-            f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
+    with open(P.join(output_dir, args.prefix+"_val.txt"), 'w') as f:
+        for video_path in video_paths[-n_test:int(-n_test/2)]:
         #for video_path in video_paths[-n_test:]:
-        #    f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
+            f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
     f.close()
 
     # Separate test and validation set
-    #with open(P.join(output_dir, args.prefix+"_true_test.txt"), "w") as f:
-    #    for video_path in video_paths[int(-n_test/2):]:
-    #        f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
-    #f.close()
+    with open(P.join(output_dir, args.prefix+"_test.txt"), "w") as f:
+        for video_path in video_paths[int(-n_test/2):]:
+            f.write(f"{os.path.basename(video_path).split('.')[0]}\n")
+    f.close()
     print("Done splitting train and test and val")

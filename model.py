@@ -672,9 +672,14 @@ class Modal_Response_Net(nn.Module):
         self.n_iter = -1
 
     def parse_batch(self, batch):
-        raw_rgb, raw_flow, raw_freqs, video_name = batch
-        #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
-        self.inputs = (raw_rgb.to(self.device).float(), raw_flow.float())
+        if config.train_visual_feature_extractor:
+            raw_rgb, raw_flow, raw_freqs, video_name = batch
+            #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
+            self.inputs = (raw_rgb.to(self.device).float(), raw_flow.float())
+        else:
+            input, raw_freqs, video_name, frame_index = batch
+            self.inputs = input.to(self.device).float()
+            self.frame_index = frame_index
         self.gt_raw_freqs = raw_freqs.to(self.device).float()
         self.video_name = video_name
 

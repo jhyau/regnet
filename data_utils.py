@@ -511,24 +511,31 @@ class RegnetLoader(torch.utils.data.Dataset):
     def __get_frames__(self, vid_id, frame_index):
         """
         Gets frame of feature vector from all the provided videos
-        Also get the classification label (ceramic-plate, glass, etc.)
+        Also get the classification label (ceramic-plate, glass, etc.) if doing classification
         """
         video_id = self.video_ids[vid_id]
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
         flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
-
-        label = self.__get_label__(video_id)
-        # Transform with label encoder
-        encoded = self.le.transform([label])[0]
-        #print(f"label of video: {label} and encoded ver. {encoded}")
-
+    
         # Keep the single frame as 1 dim in time, so (1, 1024), not (1024,)
         im = self.get_im(im_path)[frame_index:frame_index+1, :]
         flow = self.get_flow(flow_path)[frame_index:frame_index+1, :]
         feature = np.concatenate((im, flow), 1) # Visual dim=2048
 
         feature = torch.FloatTensor(feature.astype(np.float32))
+
+        if config.classification:
+            label = self.__get_label__(video_id)
+            # Transform with label encoder
+            encoded = self.le.transform([label])[0]
+            #print(f"label of video: {label} and encoded ver. {encoded}")
+        elif config.load_modal_data:
+            modal_feat = os.path.join(config.modal_features_dir, video_id+"_"+self.load_modal_data_type+".npy")
+            encoded = self.get_modal_feature(modal_feat)
+
         return (feature, encoded, video_id, frame_index)
+        
+
 
 
     def __len__(self):
