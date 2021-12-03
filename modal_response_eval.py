@@ -97,7 +97,6 @@ def test_model(args, visualization=True):
             except Exception as ex:
                 print(str(ex))
                 continue
-            #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):

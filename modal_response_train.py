@@ -59,21 +59,17 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
                 for j in range(len(model.decoder_output)):
                     plt.figure(figsize=(8, 9))
                     plt.subplot(311)
-                    plt.imshow(model.real_B[j].data.cpu().numpy(), 
+                    plt.imshow(model.gt_raw_freqs[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
                     plt.title(model.video_name[j]+"_ground_truth")
                     plt.subplot(312)
-                    plt.imshow(model.fake_B[j].data.cpu().numpy(), 
+                    plt.imshow(model.decoder_output[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
                     plt.title(model.video_name[j]+"_predict")
-                    plt.subplot(313)
-                    plt.imshow(model.fake_B_postnet[j].data.cpu().numpy(), 
-                                    aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_postnet")
                     plt.tight_layout()
                     viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
                     os.makedirs(viz_dir, exist_ok=True)
-                    plt.savefig(os.path.join(viz_dir, model.video_name[j]+".jpg"))
+                    plt.savefig(os.path.join(viz_dir, model.video_name[j]+f"_{model.frame_index[j]}.jpg"))
                     plt.close()
 
             targets = model.gt_raw_freqs
