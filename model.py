@@ -324,7 +324,7 @@ class Encoder(nn.Module):
         #print("before bilstm: ", x.size())
 
         # For classification, don't need to go through BiLISTM
-        if config.classification:
+        if config.classification or not config.use_lstm:
             return x
 
         x, _ = self.BiLSTM(x)
@@ -422,18 +422,28 @@ class Modal_Impulse_Decoder(nn.Module):
         # Set up the decoder's convolution layers
         # Raw frequencies (1, 1, 256), raw gains: (1, 1, 256), raw dampings: (1, 256)
         # Visual encoder output has shape (batch size, video_samples, encoder_embedding_dim [2048])
+        # If passes LSTM, then shape is (batch size, video_samples, config.encoder_embedding_dim/2 [1024])
+        if config.use_lstm:
+            in_chan = config.video_samples
+        else:
+            # Assuming per frame inputs
+            assert(config.per_frame == True)
+            in_chan = 1
+
         model = []
-        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=config.video_samples,
+        model += [nn.Conv1d(in_channels=in_chan, out_channels=in_chan,
             kernel_size=5, stride=2, padding=2, dilation=1)]
         model += [nn.BatchNorm1d(config.video_samples)]
         model += [nn.ReLU(True)]
 
-        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=config.video_samples,
-            kernel_size=5, stride=2, padding=2, dilation=1)]
-        model += [nn.BatchNorm1d(config.video_samples)]
-        model += [nn.ReLU(True)]
+        if not config.use_lstm:
+            # Need an extra layer of convolutions if output is directly from visual encoder and doesn't go through LSTM
+            model += [nn.Conv1d(in_channels=in_chan, out_channels=in_chan,
+                kernel_size=5, stride=2, padding=2, dilation=1)]
+            model += [nn.BatchNorm1d(config.video_samples)]
+            model += [nn.ReLU(True)]
 
-        model += [nn.Conv1d(in_channels=config.video_samples, out_channels=1,
+        model += [nn.Conv1d(in_channels=in_chan, out_channels=1,
             kernel_size=5, stride=2, padding=2, dilation=1)]
         model += [nn.BatchNorm1d(1)]
         model += [nn.ReLU(True)]
@@ -646,9 +656,10 @@ class Frequency_Net(nn.Module):
         print(f"input to encoder: {inputs.shape}")
         encoder_output = self.encoder(inputs * vis_thr)
         print(f"encoder output: {encoder_output.shape}")
-        self.decoder_output = self.decoder(encoder_output)
+        decoder_output = self.decoder(encoder_output)
         print(f"decoder output shape: {self.decoder_output.shape}")
-        return self.decoder_output
+        assert(decoder_output.shape[-1] == config.n_modal_frequencies) # Needs to match frequency shape
+        return decoder_output
 
 
 class Modal_Response_Net(nn.Module):

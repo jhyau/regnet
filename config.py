@@ -67,6 +67,7 @@ _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_re
 _C.train_visual_feature_extractor = False
 _C.pred_type = "mel_spec" # or "freq"
 _C.visual_feature_extractor = 'bn-inception' # or 'resnet50'
+_C.use_lstm = True
 
 # Data loading parameters
 _C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
