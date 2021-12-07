@@ -197,7 +197,7 @@ class TSNDataSet(torch.utils.data.Dataset):
         process_data_rgb = self.transform(images_rgb)
         process_data_flow = self.transform(images_flow)
 
-        if config.pred_type == 'freq':
+        if config.pred_type == 'freq' or config.pred_type == 'gain' or config.pred_type == 'damping':
             # Get the corresponding ground truth frequency
             feat = self._get_modal_feature(self.video_list[index])
         elif config.pred_type == 'mel_spec':
@@ -535,9 +535,6 @@ class RegnetLoader(torch.utils.data.Dataset):
 
         return (feature, encoded, video_id, frame_index)
         
-
-
-
     def __len__(self):
         if not self.per_frame:
             # Per video examples
