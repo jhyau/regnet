@@ -75,8 +75,10 @@ def test_model(args, visualization=True):
     model.setup()
     model.eval()
 
-    os.makedirs(os.path.join(config.checkpoint_path, "eval_output"), exist_ok=True)
-    eval_path = os.path.join(config.checkpoint_path, "eval_output")
+    last_slash = config.checkpoint_path.rindex('/')
+    eval_path = os.path.join(config.checkpoint_path[:last_slash+1], args.eval_output_dir)
+    print(f"Save eval path: {eval_path}")
+    os.makedirs(eval_path, exist_ok=True)
     reduced_loss_ = []
     with torch.no_grad():
         for i, batch in enumerate(test_loader):
@@ -89,7 +91,7 @@ def test_model(args, visualization=True):
             if visualization:
                 for j in range(len(targets)):
                     name = model.video_name[j].split('/')[-1]
-                    print(name)
+                    #print(name)
                     # Save the predicted frequency
                     np.save(os.path.join(eval_path, name+".npy"), model.decoder_output[j].data.cpu().numpy())
             try:
@@ -100,13 +102,14 @@ def test_model(args, visualization=True):
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):
-                print("Test loss epoch:{} iter:{} {:.6f} ".format(epoch, i, reduced_loss))
+                print("Test loss iter:{} {:.6f} ".format(i, reduced_loss))
     return np.mean(reduced_loss_) # Return the average of loss over test set
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--input_dir', type=str, default=config.optical_flow_dir)
+    parser.add_argument('-e', '--eval_output_dir', type=str, default='eval_output', help="Output dir for evaluation results")
     parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
     parser.add_argument('-t', '--test_list', type=str)
     parser.add_argument('--input_size', type=int, default=224)
