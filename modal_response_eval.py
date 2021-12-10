@@ -75,8 +75,9 @@ def test_model(args, visualization=True):
     model.setup()
     model.eval()
 
-    last_slash = config.checkpoint_path.rindex('/')
-    eval_path = os.path.join(config.checkpoint_path[:last_slash+1], args.eval_output_dir)
+    #last_slash = config.checkpoint_path.rindex('/')
+    #eval_path = os.path.join(config.checkpoint_path[:last_slash+1], args.eval_output_dir)
+    eval_path = os.path.join(config.checkpoint_path, args.eval_output_dir) # output path: <path to checkpoint>/<eval_output_dir>
     print(f"Save eval path: {eval_path}")
     os.makedirs(eval_path, exist_ok=True)
     reduced_loss_ = []
