@@ -86,17 +86,20 @@ def test_model(args, visualization=True):
             model.parse_batch(batch)
             model.forward()
 
-            targets = model.gt_raw_freqs
-            targets.requires_grad = False
+            targets_gains = model.gt_raw_gains
+            targets_gains.requires_grad = False
+            targets_dampings = model.gt_raw_dampings
+            targets_dampings.requires_grad = False
 
             if visualization:
                 for j in range(len(targets)):
                     name = model.video_name[j].split('/')[-1]
                     #print(name)
                     # Save the predicted frequency
-                    np.save(os.path.join(eval_path, name+".npy"), model.decoder_output[j].data.cpu().numpy())
+                    np.save(os.path.join(eval_path, name+"_gain.npy"), model.pred_gains[j].data.cpu().numpy())
+                    np.save(os.path.join(eval_path, name+"_dampings.npy"), model.pred_dampings[j].data.cpu().numpy())
             try:
-                loss = criterion(model.decoder_output, targets)
+                loss = criterion(model.pred_gains, targets_gains) + criterion(model.pred_dampings, targets_dampings)
             except Exception as ex:
                 print(str(ex))
                 continue

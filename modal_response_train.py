@@ -56,25 +56,36 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
             model.parse_batch(batch)
             model.forward()
             if visualization:
-                for j in range(len(model.decoder_output)):
+                for j in range(len(model.pred_gains)):
                     plt.figure(figsize=(8, 9))
-                    plt.subplot(311)
-                    plt.imshow(model.gt_raw_freqs[j].data.cpu().numpy(), 
+                    plt.subplot(411)
+                    plt.imshow(model.gt_raw_gains[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_ground_truth")
-                    plt.subplot(312)
-                    plt.imshow(model.decoder_output[j].data.cpu().numpy(), 
+                    plt.title(model.video_name[j]+"_ground_truth_gains")
+                    plt.subplot(412)
+                    plt.imshow(model.pred_gains[j].data.cpu().numpy(), 
                                     aspect='auto', origin='lower')
-                    plt.title(model.video_name[j]+"_predict")
+                    plt.title(model.video_name[j]+"_predict_gains")
+                    plt.subplot(413)
+                    plt.imshow(model.gt_raw_dampings[j].data.cpu().numpy(),
+                            aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_ground_truth_dampings")
+                    plt.subplot(414)
+                    plt.imshow(model.pred_dampings[j].data.cpu().numpy(),
+                            aspect='auto', origin='lower')
+                    plt.title(model.video_name[j]+"_predict_dampings")
                     plt.tight_layout()
                     viz_dir = os.path.join(config.save_dir, "viz", f'epoch_{epoch:05d}')
                     os.makedirs(viz_dir, exist_ok=True)
                     plt.savefig(os.path.join(viz_dir, model.video_name[j]+f"_{model.frame_index[j]}.jpg"))
                     plt.close()
 
-            targets = model.gt_raw_freqs
-            targets.requires_grad = False
-            loss = criterion(model.decoder_output, targets)
+            targets_gains = model.gt_raw_gains
+            targets_gains.requires_grad = False
+            targets_dampings = model.gt_raw_dampings
+            targets_dampings.requires_grad = False
+
+            loss = criterion(model.pred_gains, targets_gains) + criterion(model.pred_dampings, targets_dampings)
             #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
