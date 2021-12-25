@@ -666,9 +666,11 @@ class Modal_Response_Net(nn.Module):
     def __init__(self):
         super(Modal_Response_Net, self).__init__()
         self.config = config
-        self.model_names = ["visual_encoder_frequency_decoder"]
+        self.model_names = ["gain_model", "damping_model"]
         self.device = torch.device('cuda:0')
-        self.freq_model = init_net(Frequency_Net(), self.device)
+        #self.freq_model = init_net(Frequency_Net(), self.device)
+        self.gain_model = init_net(Frequency_Net(), self.device)
+        self.damping_model = init_net(Frequency_Net(), self.device)
 
         # Reconstruction loss
         if config.loss_type == "MSE":
@@ -678,32 +680,46 @@ class Modal_Response_Net(nn.Module):
         else:
             print("ERROR LOSS TYPE!")
         self.criterionL1 = loss_fn.to(self.device)
-        self.optimizer = torch.optim.Adam(self.freq_model.parameters(),
+
+        self.optimizers = []
+        self.optimizer_gain = torch.optim.Adam(self.gain_model.parameters(),
                                             lr=config.lr, betas=(config.beta1, 0.999))
+        self.optimizer_damp = torch.optim.Adam(self.damping_model.parameters(),
+                                            lr=config.lr, betas=(config.beta1, 0.999))
+        self.optimizers.append(self.optimizer_gain)
+        self.optimizers.append(self.optimizer_damp)
+        
         self.n_iter = -1
 
     def parse_batch(self, batch):
         if config.train_visual_feature_extractor:
-            raw_rgb, raw_flow, raw_freqs, video_name = batch
+            raw_rgb, raw_flow, raw_gains, raw_dampings, video_name = batch
             #self.inputs = (raw_rgb.to(self.device).float(), raw_flow.to(self.device).float())
             self.inputs = (raw_rgb.to(self.device).float(), raw_flow.float())
         else:
-            input, raw_freqs, video_name, frame_index = batch
+            input, raw_gains, raw_dampings, video_name, frame_index = batch
             self.inputs = input.to(self.device).float()
             self.frame_index = frame_index
-        self.gt_raw_freqs = raw_freqs.to(self.device).float()
+        self.gt_raw_gains = raw_gains.to(self.device).float()
+        self.gt_raw_dampings = raw_dampings.to(self.device).float()
         self.video_name = video_name
 
     def forward(self):
         # Pass the input through the visual encoder and frequency decoder
-        self.decoder_output = self.freq_model(self.inputs)
-        return self.decoder_output
+        self.pred_gains = self.gain_model(self.inputs)
+        self.pred_dampings = self.damping_model(self.inputs)
+        return self.decoder_output, self.pred_dampings
 
     def backward(self):
         # Reconstruction loss for the predicted frequency
-        targets = self.gt_raw_freqs
-        targets.requires_grad = False
-        self.loss_L1 = self.criterionL1(self.decoder_output, targets)
+        targets_gains = self.gt_raw_gains
+        targets_gains.requires_grad = False
+        targets_dampings = self.gt_raw_dampings
+        targets_dampings.requires_grad = False
+
+        self.loss_gains = self.criterionL1(self.pred_gains, targets_gains)
+        self.loss_dampings = self.criterionL1(self.pred_dampings, targets_dampings)
+        self.loss_L1 = self.loss_gains + self.loss_dampings
 
         # loss_G_GAN is adversarial loss, the other two term (loss_G_L1 and loss_G_silence) are reconstruction loss
         #self.loss_G = self.loss_G_GAN + self.loss_G_L1 * self.config.lambda_Oriloss + self.loss_G_silence * self.config.lambda_Silenceloss
@@ -721,7 +737,7 @@ class Modal_Response_Net(nn.Module):
         return scheduler
 
     def setup(self):
-        self.scheduler = self.get_scheduler(self.optimizer, config)  #[self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
+        self.scheduler = [self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
 
     def load_checkpoint(self, checkpoint_path):
         for name in self.model_names:
@@ -731,8 +747,8 @@ class Modal_Response_Net(nn.Module):
             if hasattr(state_dict, '_metadata'):
                 del state_dict._metadata
 
-            #net = getattr(self, 'net' + name)
-            net = self.freq_model
+            net = getattr(self, name)
+            #net = self.gain_model
             if isinstance(net, torch.nn.DataParallel):
                 net = net.module
             checkpoint_state = state_dict["optimizer_net{}".format(name)]
@@ -746,13 +762,13 @@ class Modal_Response_Net(nn.Module):
 
     def save_checkpoint(self, save_directory, iteration, do_not_delete=[], save_current=False):
         # do_not_delete list of model_path checkpoints that shouldn't be deleted
-        lr = self.optimizer.param_groups[0]['lr']
+        lr = self.optimizers[0].param_groups[0]['lr']
         for name in self.model_names:
             filepath = os.path.join(save_directory, "checkpoint_{:0>6d}_net{}".format(iteration, name))
             print("Saving net{} and optimizer state at iteration {} to {}".format(
                 name, iteration, filepath))
-            #net = getattr(self, 'net' + name)
-            net = self.freq_model
+            net = getattr(self, name)
+            #net = self.gain_model
             if torch.cuda.is_available():
                 torch.save({"iteration": iteration,
                             "learning_rate": lr,
@@ -782,7 +798,7 @@ class Modal_Response_Net(nn.Module):
     def update_learning_rate(self):
         #for scheduler in self.schedulers:
         self.scheduler.step()
-        lr = self.optimizer.param_groups[0]['lr']
+        lr = self.optimizers[0].param_groups[0]['lr']
         print('learning rate = %.7f' % lr)
 
     def set_requires_grad(self, nets, requires_grad=False):
@@ -805,13 +821,15 @@ class Modal_Response_Net(nn.Module):
 
         # update model
         #self.set_requires_grad(self.netD, False)
-        self.optimizer.zero_grad()
+        self.optimizer_gain.zero_grad()
+        self.optimizer_damp.zero_grad()
 
         if config.pairing_loss:
             self.backward_G_pairing_loss()
         else:
             self.backward()
-        self.optimizer.step()
+        self.optimizer_gain.step()
+        self.optimizer_damp.step()
 
 
 class Regnet_G(nn.Module):

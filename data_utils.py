@@ -291,14 +291,16 @@ class RegnetLoader(torch.utils.data.Dataset):
     def get_feature_modal_response(self, video_id):
         im_path = os.path.join(config.rgb_feature_dir, video_id+".pkl")
         flow_path = os.path.join(config.flow_feature_dir, video_id+".pkl")
-        modal_feat = os.path.join(config.modal_features_dir, video_id+"_"+self.load_modal_data_type+".npy") 
+        modal_gains = os.path.join(config.modal_features_dir, video_id+"_gains"+self.load_modal_data_type+".npy") 
+        modal_dampings = os.path.join(config.modal_features_dir, video_id+"_dampings"+self.load_modal_data_type+".npy")
 
         im = self.get_im(im_path)
         flow = self.get_flow(flow_path)
-        feats = self.get_modal_feature(modal_feat)
+        feats_gains = self.get_modal_feature(modal_gains)
+        feats_dampings = self.get_modal_feature(modal_dampings)
         feature = np.concatenate((im, flow), 1) # Visual dim=2048
         feature = torch.FloatTensor(feature.astype(np.float32))
-        return (feature, feats, video_id)
+        return (feature, feats_gains, feats_dampings, video_id)
 
 
     def get_feature_mel_pair(self, video_id):

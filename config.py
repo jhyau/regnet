@@ -40,7 +40,7 @@ _C.temporal_alignment_lambda = 1.0 # Weight for temporal loss
 _C.visual_encoder_input = True
 
 # Classification task
-_C.classification = True
+_C.classification = False
 
 # Include extra upsampling (needed to match waveglow configs of 44100 audio sampling rate, 1720 mel samples)
 _C.extra_upsampling = True
@@ -61,11 +61,11 @@ _C.encoder_n_convolutions = 3
 
 # Modal impulse prediction parameters
 _C.n_modal_frequencies = 256 # Could possibly be reduced down to 64?
-_C.load_modal_data_type = "freqs_raw"
+_C.load_modal_data_type = "_raw" # raw or control for modal response
 _C.load_modal_data = True
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 _C.train_visual_feature_extractor = False
-_C.pred_type = "mel_spec" # or "freq"
+_C.pred_type = "freq" # "mel_spec"
 _C.visual_feature_extractor = 'bn-inception' # or 'resnet50'
 _C.use_lstm = True
 

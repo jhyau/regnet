@@ -142,17 +142,22 @@ def train(args):
             model.parse_batch(batch)
             
             model.optimize_parameters()
-            learning_rate = model.optimizer.param_groups[0]['lr']
+            learning_rate = model.optimizers[0].param_groups[0]['lr']
 
-            targets = model.gt_raw_freqs
-            targets.requires_grad = False
-            loss = criterion(model.decoder_output, targets)
+            targets_gains = model.gt_raw_gains
+            targets_gains.requires_grad = False
+            targets_dampings = model.gt_raw_dampings
+            targets_dampings.requires_grad = False
+
+            loss = criterion(model.pred_gains, targets_gains) + criterion(model.pred_dampings, targets_dampings)
             reduced_loss = loss.item()
 
             if not math.isnan(reduced_loss):
                 duration = time.perf_counter() - start
-                print("epoch:{} iter:{} loss:{:.6f} L1:{:.6f}  real-fake:{:.6f} time:{:.2f}s/it".format(
-                        epoch, i, reduced_loss, model.loss_L1, (model.gt_raw_freqs - model.decoder_output).mean(), duration))
+                gain_diff = (model.gt_raw_gains - model.pred_gains).mean()
+                damping_diff = (model.gt_raw_dampings - mode.pred_dampings).mean()
+                print("epoch:{} iter:{} loss:{:.6f} L1:{:.6f}  gain real-fake:{:.6f} damping real-fake:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_L1, gain_diff, damping_diff, duration))
                 logger.log_training(model, reduced_loss, learning_rate, duration, iteration)
 
             iteration += 1

@@ -28,7 +28,8 @@ class RegnetLogger(SummaryWriter):
 
         if not self.exclude_D_r_f:
             #self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
-            self.add_scalar("training.real-fake", (model.decoder_output - model.gt_raw_freqs).mean(), iteration)
+            self.add_scalar("training.gains-real-fake", (model.pred_gains - model.gt_raw_gains).mean(), iteration)
+            self.add_scalar("training.dampings-real-fake", (model.pred_dampings - model.gt_raw_dampings).mean(), iteration)
         self.add_scalar("duration", duration, iteration)
 
     def log_testing(self, reduced_loss, epoch):
