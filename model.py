@@ -738,7 +738,7 @@ class Modal_Response_Net(nn.Module):
         return scheduler
 
     def setup(self):
-        self.scheduler = [self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
+        self.schedulers = [self.get_scheduler(optimizer, config) for optimizer in self.optimizers]
 
     def load_checkpoint(self, checkpoint_path):
         for name in self.model_names:
@@ -797,8 +797,8 @@ class Modal_Response_Net(nn.Module):
 
 
     def update_learning_rate(self):
-        #for scheduler in self.schedulers:
-        self.scheduler.step()
+        for scheduler in self.schedulers:
+            scheduler.step()
         lr = self.optimizers[0].param_groups[0]['lr']
         print('learning rate = %.7f' % lr)
 
