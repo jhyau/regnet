@@ -166,7 +166,7 @@ def train(args):
             if not math.isnan(reduced_loss):
                 duration = time.perf_counter() - start
                 gain_diff = (model.gt_raw_gains - model.pred_gains).mean()
-                damping_diff = (model.gt_raw_dampings - mode.pred_dampings).mean()
+                damping_diff = (model.gt_raw_dampings - model.pred_dampings).mean()
                 print("epoch:{} iter:{} loss:{:.6f} L1:{:.6f}  gain real-fake:{:.6f} damping real-fake:{:.6f} time:{:.2f}s/it".format(
                         epoch, i, reduced_loss, model.loss_L1, gain_diff, damping_diff, duration))
                 logger.log_training(model, reduced_loss, learning_rate, duration, iteration)
