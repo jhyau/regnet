@@ -324,13 +324,13 @@ class Encoder(nn.Module):
         #print("before bilstm: ", x.size())
 
         # For classification, don't need to go through BiLISTM
-        if config.classification or not config.use_lstm:
+        if not config.use_lstm:
             return x
 
         x, _ = self.BiLSTM(x)
         #print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
-        #print("after linear layer: ", x.size())
+        print("after biLSTM+linear layer: ", x.size())
         return x
 
 
@@ -424,6 +424,7 @@ class Modal_Impulse_Decoder(nn.Module):
         # Visual encoder output has shape (batch size, video_samples, encoder_embedding_dim [2048])
         # If passes LSTM, then shape is (batch size, video_samples, config.encoder_embedding_dim/2 [1024])
         if config.use_lstm:
+            # Since using LSTM, assuming there is some time dimension represented by video_samples
             in_chan = config.video_samples
         else:
             # Assuming per frame inputs
@@ -708,7 +709,7 @@ class Modal_Response_Net(nn.Module):
         # Pass the input through the visual encoder and frequency decoder
         self.pred_gains = self.gain_model(self.inputs)
         self.pred_dampings = self.damping_model(self.inputs)
-        return self.decoder_output, self.pred_dampings
+        return self.pred_gains, self.pred_dampings
 
     def backward(self):
         # Reconstruction loss for the predicted frequency

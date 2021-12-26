@@ -532,10 +532,13 @@ class RegnetLoader(torch.utils.data.Dataset):
             encoded = self.le.transform([label])[0]
             #print(f"label of video: {label} and encoded ver. {encoded}")
         elif config.load_modal_data:
-            modal_feat = os.path.join(config.modal_features_dir, video_id+"_"+self.load_modal_data_type+".npy")
-            encoded = self.get_modal_feature(modal_feat)
+            #modal_feat = os.path.join(config.modal_features_dir, video_id+"_"+self.load_modal_data_type+".npy")
+            modal_gains = os.path.join(config.modal_features_dir, video_id+"_gains"+self.load_modal_data_type+".npy")
+            modal_dampings = os.path.join(config.modal_features_dir, video_id+"_dampings"+self.load_modal_data_type+".npy")
+            encoded_gains = self.get_modal_feature(modal_gains)
+            encoded_dampings = self.get_modal_feature(modal_dampings)
 
-        return (feature, encoded, video_id, frame_index)
+        return (feature, encoded_gains, encoded_dampings, video_id, frame_index)
         
     def __len__(self):
         if not self.per_frame:
