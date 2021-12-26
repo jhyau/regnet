@@ -330,7 +330,7 @@ class Encoder(nn.Module):
         x, _ = self.BiLSTM(x)
         #print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
-        print("after biLSTM+linear layer: ", x.size())
+        #print("after biLSTM+linear layer: ", x.size())
         return x
 
 
@@ -423,7 +423,7 @@ class Modal_Impulse_Decoder(nn.Module):
         # Raw frequencies (1, 1, 256), raw gains: (1, 1, 256), raw dampings: (1, 256)
         # Visual encoder output has shape (batch size, video_samples, encoder_embedding_dim [2048])
         # If passes LSTM, then shape is (batch size, video_samples, config.encoder_embedding_dim/2 [1024])
-        if config.use_lstm:
+        if config.use_lstm and not config.per_frame:
             # Since using LSTM, assuming there is some time dimension represented by video_samples
             in_chan = config.video_samples
         else:
@@ -654,9 +654,9 @@ class Frequency_Net(nn.Module):
 
         # For pre-extracted features, can directly pass through the encoder
         # Pass the input through the visual encoder
-        print(f"input to encoder: {inputs.shape}")
+        #print(f"input to encoder: {inputs.shape}")
         encoder_output = self.encoder(inputs * vis_thr)
-        print(f"encoder output: {encoder_output.shape}")
+        #print(f"encoder output: {encoder_output.shape}")
         decoder_output = self.decoder(encoder_output)
         print(f"decoder output shape: {decoder_output.shape}")
         assert(decoder_output.shape[-1] == config.n_modal_frequencies) # Needs to match frequency shape
