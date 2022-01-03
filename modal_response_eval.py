@@ -115,7 +115,7 @@ def test_model(args, visualization=True):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     #parser.add_argument('-i', '--input_dir', type=str, default=config.optical_flow_dir)
-    parser.add_argument('-e', '--eval_output_dir', type=str, default='eval_output', help="Output dir for evaluation results")
+    parser.add_argument('-e', '--eval_output_dir', type=str, default='eval_output', help="Output dir for evaluation results. Note that this will be joined with the config.checkpoint_path")
     #parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
     #parser.add_argument('-t', '--test_list', type=str)
     #parser.add_argument('--input_size', type=int, default=224)
