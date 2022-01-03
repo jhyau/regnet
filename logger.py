@@ -10,6 +10,10 @@ class RegnetLogger(SummaryWriter):
     def log_training(self, model, reduced_loss, learning_rate, duration,
                      iteration):
         self.add_scalar("training.loss", reduced_loss, iteration)
+        # Modal response losses
+        self.add_scalar("training.gains-loss", model.loss_gains, iteration)
+        self.add_scalar("training.dampings-loss", model.loss_dampings, iteration)
+
         self.add_scalar("learning.rate", learning_rate, iteration)
         #self.add_scalar("training.loss_G", model.loss_G, iteration)
         self.add_scalar("training.loss_L1", model.loss_L1, iteration)

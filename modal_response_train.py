@@ -85,12 +85,14 @@ def test_model(model, criterion, test_loader, epoch, logger, visualization=False
             targets_dampings = model.gt_raw_dampings
             targets_dampings.requires_grad = False
 
-            loss = criterion(model.pred_gains, targets_gains) + criterion(model.pred_dampings, targets_dampings)
+            gains_loss = criterion(model.pred_gains, targets_gains)
+            dampings_loss = criterion(model.pred_dampings, targets_dampings)
+            loss = gains_loss + dampings_loss
             #loss = criterion((model.fake_B, model.fake_B_postnet), model.real_B)
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):
-                print("Test loss epoch:{} iter:{} {:.6f} ".format(epoch, i, reduced_loss))
+                print("Test loss epoch:{} iter:{} {:.6f} gains loss: {:.6f} dampings loss: {:.6f}".format(epoch, i, reduced_loss, gains_loss, dampings_loss))
         logger.log_testing(np.mean(reduced_loss_), epoch)
     model.train()
     return np.mean(reduced_loss_) # Return the average of loss over test set
@@ -167,8 +169,8 @@ def train(args):
                 duration = time.perf_counter() - start
                 gain_diff = (model.gt_raw_gains - model.pred_gains).mean()
                 damping_diff = (model.gt_raw_dampings - model.pred_dampings).mean()
-                print("epoch:{} iter:{} loss:{:.6f} L1:{:.6f}  gain real-fake:{:.6f} damping real-fake:{:.6f} time:{:.2f}s/it".format(
-                        epoch, i, reduced_loss, model.loss_L1, gain_diff, damping_diff, duration))
+                print("epoch:{} iter:{} loss:{:.6f} gain_loss:{:.6f} dampings_loss:{:.6f} L1:{:.6f}  gain real-fake:{:.6f} damping real-fake:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_gains, model.loss_dampings, model.loss_L1, gain_diff, damping_diff, duration))
                 logger.log_training(model, reduced_loss, learning_rate, duration, iteration)
 
             iteration += 1

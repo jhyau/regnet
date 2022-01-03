@@ -92,37 +92,39 @@ def test_model(args, visualization=True):
             targets_dampings.requires_grad = False
 
             if visualization:
-                for j in range(len(targets)):
+                for j in range(len(targets_dampings)):
                     name = model.video_name[j].split('/')[-1]
                     #print(name)
                     # Save the predicted frequency
                     np.save(os.path.join(eval_path, name+"_gain.npy"), model.pred_gains[j].data.cpu().numpy())
                     np.save(os.path.join(eval_path, name+"_dampings.npy"), model.pred_dampings[j].data.cpu().numpy())
             try:
-                loss = criterion(model.pred_gains, targets_gains) + criterion(model.pred_dampings, targets_dampings)
+                gains_loss = criterion(model.pred_gains, targets_gains)
+                dampings_loss = criterion(model.pred_dampings, targets_dampings)
+                loss = gains_loss + dampings_loss
             except Exception as ex:
                 print(str(ex))
                 continue
             reduced_loss = loss.item()
             reduced_loss_.append(reduced_loss)
             if not math.isnan(reduced_loss):
-                print("Test loss iter:{} {:.6f} ".format(i, reduced_loss))
+                print("Test loss iter:{} {:.6f} gains loss: {:.6f} dampings loss: {:.6f}".format(i, reduced_loss, gains_loss, dampings_loss))
     return np.mean(reduced_loss_) # Return the average of loss over test set
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-i', '--input_dir', type=str, default=config.optical_flow_dir)
+    #parser.add_argument('-i', '--input_dir', type=str, default=config.optical_flow_dir)
     parser.add_argument('-e', '--eval_output_dir', type=str, default='eval_output', help="Output dir for evaluation results")
-    parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
-    parser.add_argument('-t', '--test_list', type=str)
-    parser.add_argument('--input_size', type=int, default=224)
-    parser.add_argument('--crop_fusion_type', type=str, default='avg',
-                        choices=['avg', 'max', 'topk'])
-    parser.add_argument('--dropout', type=float, default=0.7)
+    #parser.add_argument('-m', '--modality', type=str, choices=['RGB', 'RGB_landmarks', 'Flow'])
+    #parser.add_argument('-t', '--test_list', type=str)
+    #parser.add_argument('--input_size', type=int, default=224)
+    #parser.add_argument('--crop_fusion_type', type=str, default='avg',
+    #                    choices=['avg', 'max', 'topk'])
+    #parser.add_argument('--dropout', type=float, default=0.7)
     parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                         help='number of data loading workers (default: 4)')
-    parser.add_argument('--flow_prefix', type=str, default='')
+    #parser.add_argument('--flow_prefix', type=str, default='')
     #parser.add_argument('--extra_upsampling', action='store_true', help='include flag to add extra upsampling layers in the decoder and discriminator to match 44100 audio sample rate')
     #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to concatenate skeletal landmark features to the feature vector')
     parser.add_argument('-c', '--config_file', type=str, default='',

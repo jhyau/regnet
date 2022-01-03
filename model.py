@@ -757,9 +757,9 @@ class Modal_Response_Net(nn.Module):
             self.iteration = state_dict["iteration"]
 
             learning_rate = state_dict["learning_rate"]
-        #for index in range(len(self.optimizers)):
-        for param_group in self.optimizer.param_groups:
-            param_group['lr'] = learning_rate
+        for index in range(len(self.optimizers)):    
+            for param_group in self.optimizers[index].param_groups:
+                param_group['lr'] = learning_rate
 
     def save_checkpoint(self, save_directory, iteration, do_not_delete=[], save_current=False):
         # do_not_delete list of model_path checkpoints that shouldn't be deleted
