@@ -272,7 +272,7 @@ if __name__ == '__main__':
     parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/published_ver/waveglow_256channels_universal_v5.pt', help='The path to waveglow checkpoint to load. Currently default is set to Waveglow published weights')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
     parser.add_argument('--sigma', default=2.0, type=float)
-    parser.add_argument('--sampling_rate', default=22050, type=int)
+    parser.add_argument('--sampling_rate', default=44100, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
     parser.add_argument('--num_plots', default=35, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
