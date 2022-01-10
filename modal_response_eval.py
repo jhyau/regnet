@@ -28,24 +28,24 @@ def prepare_dataloaders(args):
     #valset = RegnetLoader(config.test_files, include_landmarks=args.include_landmarks)
     if config.train_visual_feature_extractor:
         print("Getting the images to be stacked...")
-        trainset = get_TSN_Data_set(args, 'train')
+        #trainset = get_TSN_Data_set(args, 'train')
         valset = get_TSN_Data_set(args, 'eval') 
     else:
-        trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
+        #trainset = RegnetLoader(config.training_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
         valset = RegnetLoader(config.test_files, include_landmarks=config.include_landmarks, pairing_loss=config.pairing_loss)
 
     # Handle the tuple of tuples loaded from RegnetLoader when pairing loss is used within parse_batch in the model
     # Originally, num_workers is set to 4 (seems to go out of memory when loading raw images)
-    train_loader = DataLoader(trainset, num_workers=0, shuffle=True,
-                              batch_size=config.batch_size, pin_memory=False,
-                              drop_last=True)
-    test_loader = DataLoader(valset, num_workers=0, shuffle=False,
+    #train_loader = DataLoader(trainset, num_workers=0, shuffle=True,
+    #                          batch_size=config.batch_size, pin_memory=False,
+    #                          drop_last=True)
+    test_loader = DataLoader(valset, num_workers=args.workers, shuffle=False,
                              batch_size=config.batch_size, pin_memory=False)
     print("Check number of test examples: ", len(valset))
     print("Check number of test loader examples: ", len(test_loader))
     assert(len(valset) > 0)
     assert(len(test_loader) > 0)
-    return train_loader, test_loader
+    return test_loader
 
 
 def test_model(args, visualization=True):
@@ -67,7 +67,7 @@ def test_model(args, visualization=True):
     print("Initialized loss")
 
     print("Preparing data...")
-    train_loader, test_loader = prepare_dataloaders(args)
+    test_loader = prepare_dataloaders(args)
  
     model.load_checkpoint(config.checkpoint_path)
     print(f"Finished loading the model checkpoint")
