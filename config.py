@@ -13,15 +13,15 @@ _C.save_dir = 'ckpt/dog'
 _C.checkpoint_path = ''
 _C.epoch_count = 0
 _C.exclude_dirs = ['ckpt', 'data']
-_C.training_files = 'filelists/asmr_both_vids_train.txt'  #'filelists/dog_train.txt'
-_C.test_files = 'filelists/asmr_both_vids_test.txt'  #'filelists/dog_test.txt'
-_C.rgb_feature_dir = "data/features/ASMR/asmr_both_vids/feature_rgb_bninception_dim1024_21.5fps"  #"data/features/dog/feature_rgb_bninception_dim1024_21.5fps"
-_C.optical_flow_dir = "data/features/ASMR/orig_asmr_by_material_clips/OF_10s_21.5fps/" # Path to the optical flow extraction dir with raw images
+_C.training_files = '/juno/u/jyau/regnet/filelists/asmr_both_vids_train.txt'  #'filelists/dog_train.txt'
+_C.test_files = '/juno/u/jyau/regnet/filelists/asmr_both_vids_test.txt'  #'filelists/dog_test.txt'
+_C.rgb_feature_dir = "/juno/u/jyau/regnet/data/features/ASMR/asmr_both_vids/feature_rgb_bninception_dim1024_21.5fps"  #"data/features/dog/feature_rgb_bninception_dim1024_21.5fps"
+_C.optical_flow_dir = "/juno/u/jyau/regnet/data/features/ASMR/orig_asmr_by_material_clips/OF_10s_21.5fps/" # Path to the optical flow extraction dir with raw images
 # New: landmark feature dir
 _C.landmark_feature_dir = None
 
-_C.flow_feature_dir = "data/features/ASMR/asmr_both_vids/feature_flow_bninception_dim1024_21.5fps"  #"data/features/dog/feature_flow_bninception_dim1024_21.5fps"
-_C.mel_dir = "data/features/ASMR/asmr_both_vids/melspec_10s_44100hz"  #"data/features/dog/melspec_10s_22050hz"
+_C.flow_feature_dir = "/juno/u/jyau/regnet/data/features/ASMR/asmr_both_vids/feature_flow_bninception_dim1024_21.5fps"  #"data/features/dog/feature_flow_bninception_dim1024_21.5fps"
+_C.mel_dir = "/juno/u/jyau/regnet/data/features/ASMR/asmr_both_vids/melspec_10s_44100hz"  #"data/features/dog/melspec_10s_22050hz"
 _C.video_samples = 215 # Number of frames in each video. First dim of the feature vectors
 _C.audio_samples = 10  # Number of seconds of audio
 _C.mel_samples = 1720 # Original mel samples to match 22050 audio sampling rate: 860
@@ -30,14 +30,14 @@ _C.n_mel_channels = 80
 
 # Including pairing/misalignment loss
 _C.video_fps = 21.5 # Video fps. Default is 21.5, but for asmr videos, it actually is 30
-_C.pairing_loss = True
+_C.pairing_loss = False
 _C.num_misalign_frames = 43
 _C.reduced_video_samples = 108 # Reduced number of frames to allow misaligning
 _C.reduced_mel_samples = 864 # Corresponding reduced time dimension of mel spectrogram
 _C.temporal_alignment_lambda = 1.0 # Weight for temporal loss
 
 # Use visual encoder output as input to the second network/discriminator
-_C.visual_encoder_input = True
+_C.visual_encoder_input = False
 
 # Classification task
 _C.classification = False
@@ -50,7 +50,7 @@ _C.include_landmarks = False
 
 # Logger parameters
 _C.exclude_D_r_f = False
-_C.exclude_gan_loss = True
+_C.exclude_gan_loss = False
 
 # Encoder parameters
 _C.random_z_dim = 512
@@ -62,7 +62,7 @@ _C.encoder_n_convolutions = 3
 # Modal impulse prediction parameters
 _C.n_modal_frequencies = 256 # Could possibly be reduced down to 64?
 _C.load_modal_data_type = "_raw" # raw or control for modal response
-_C.load_modal_data = True
+_C.load_modal_data = False
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
 _C.train_visual_feature_extractor = False
 _C.pred_type = "freq" # "mel_spec"
@@ -71,7 +71,7 @@ _C.use_lstm = True
 
 # Data loading parameters
 _C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
-_C.per_frame = True # Loads data where each frame is an example instead of each video
+_C.per_frame = False # Loads data where each frame is an example instead of each video
 
 # Visual feature extractor parameters
 _C.consensus_type = 'avg' # 'max', 'topk'
@@ -104,5 +104,5 @@ _C.lambda_Oriloss = 1.0 # Original weight: 10000.0
 _C.lambda_Silenceloss = 0
 _C.niter = 100
 _C.D_interval = 1
-_C.wo_G_GAN = True # Flag on whether to use GAN loss(or GAN setup in our case) or not
+_C.wo_G_GAN = False # Flag on whether to use GAN loss(or GAN setup in our case) or not
 _C.wavenet_path = ""
