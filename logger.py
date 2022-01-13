@@ -19,7 +19,6 @@ class RegnetLogger(SummaryWriter):
 
         self.add_scalar("learning.rate", learning_rate, iteration)
         self.add_scalar("training.loss_G", model.loss_G, iteration)
-        self.add_scalar("training.loss_L1", model.loss_L1, iteration)
         #self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
 
         if not self.exclude_gan_loss:
@@ -35,6 +34,7 @@ class RegnetLogger(SummaryWriter):
             self.add_scalar("training.score_D_r-f", (model.pred_real - model.pred_fake).mean(), iteration)
             
             if self.modal_losses:
+                self.add_scalar("training.loss_L1", model.loss_L1, iteration)
                 self.add_scalar("training.gains-real-fake", (model.pred_gains - model.gt_raw_gains).mean(), iteration)
                 self.add_scalar("training.dampings-real-fake", (model.pred_dampings - model.gt_raw_dampings).mean(), iteration)
         self.add_scalar("duration", duration, iteration)
