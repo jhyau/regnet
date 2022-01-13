@@ -64,13 +64,12 @@ _C.n_modal_frequencies = 256 # Could possibly be reduced down to 64?
 _C.load_modal_data_type = "_raw" # raw or control for modal response
 _C.load_modal_data = False
 _C.modal_features_dir = "data/features/ASMR/orig_asmr_by_material_clips/modal_responses/"
-_C.train_visual_feature_extractor = False
+_C.train_visual_feature_extractor = False # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
 _C.pred_type = "freq" # "mel_spec"
 _C.visual_feature_extractor = 'bn-inception' # or 'resnet50'
 _C.use_lstm = True
 
 # Data loading parameters
-_C.visual_features = True # Loads from the visual features extracted from the frozen BN-Inception. False, it uses raw RGB/flow images
 _C.per_frame = False # Loads data where each frame is an example instead of each video
 
 # Visual feature extractor parameters
