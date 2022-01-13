@@ -80,7 +80,7 @@ _C.bn_inception_file = 'tsn/bninception/bn_inception_unfrozen.yaml'
 
 # Auxiliary parameters
 _C.auxiliary_type = "lstm_last"
-_C.auxiliary_dim = 256
+_C.auxiliary_dim = 32  #256
 _C.auxiliary_sample_rate = 32
 _C.mode_input = ""
 _C.aux_zero = False
