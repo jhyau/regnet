@@ -107,8 +107,14 @@ class Encoder(nn.Module):
 
         self.BiLSTM = nn.LSTM(config.encoder_embedding_dim,
                            int(config.encoder_embedding_dim / 4), config.encoder_n_lstm,
+                           # 2, config.encoder_n_lstm,
+                           # int(config.encoder_embedding_dim), config.encoder_n_lstm,
                            batch_first=True, bidirectional=True)
         self.BiLSTM_proj = nn.Linear(int(config.encoder_embedding_dim/2), int(config.encoder_embedding_dim/2))
+        # self.BiLSTM_proj = nn.Linear(4, int(config.encoder_embedding_dim/2))
+        # self.BiLSTM_proj = nn.Linear(int(config.encoder_embedding_dim*2), int(config.encoder_embedding_dim/2))
+
+        # self.BiLSTM_proj = nn.Linear(config.encoder_embedding_dim, int(config.encoder_embedding_dim/2))
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -119,9 +125,9 @@ class Encoder(nn.Module):
         for conv in self.convolutions:
             x = F.dropout(F.relu(conv(x)), 0.5, self.training)
         x = x.transpose(1, 2)
-        #print("before bilstm: ", x.size())
+        # print("before bilstm: ", x.size())
         x, _ = self.BiLSTM(x)
-        #print("after bilstm: ", x.size())
+        # print("after bilstm: ", x.size())
         x = self.BiLSTM_proj(x)
         #print("after linear layer: ", x.size())
         return x
@@ -267,6 +273,9 @@ class Decoder(nn.Module):
         #print("decode input size after transpose: ", x.size())
 
         x = self.model(x)
+        # NOTE(coconutruben): exp70 - explicit call to log.
+        # x = torch.clamp(x, 1e-18, 1.)
+        # x = torch.log(x)
         #print("decoder output size: ", x.size())
         return x
 
@@ -404,7 +413,8 @@ class GANLoss(nn.Module):
         self.register_buffer('real_label', torch.tensor(target_real_label))
         self.register_buffer('fake_label', torch.tensor(target_fake_label))
         if use_lsgan:
-            self.loss = nn.MSELoss()
+            # self.loss = nn.MSELoss()
+            self.loss = nn.MSELoss(reduction='none')
         else:
             self.loss = nn.BCELoss()
 
@@ -417,8 +427,10 @@ class GANLoss(nn.Module):
 
     def __call__(self, input, target_is_real):
         target_tensor = self.get_target_tensor(input, target_is_real)
-        return self.loss(input, target_tensor)
-
+        w = torch.exp(target_tensor)
+        # return self.loss(input, target_tensor)
+        # NOTE(coconutruben): exp80
+        return torch.mean(w * self.loss(input, target_tensor))
 
 class TemporalAlignmentLoss(nn.Module):
     """Discriminate betweeen aligned or misaligned input/target
@@ -452,7 +464,7 @@ def init_net(net, device, init_type='normal', init_gain=0.02):
     assert (torch.cuda.is_available())
     net.to(device)
     net = torch.nn.DataParallel(net, range(torch.cuda.device_count()))
-    init_weights(net, init_type, gain=init_gain)
+    # init_weights(net, init_type, gain=init_gain)
     return net
 
 
@@ -608,7 +620,7 @@ class Regnet(nn.Module):
         peaks_count = np.array([p[0] for p in peaks_info])
         # use mask to make sure that only examples where counting was successful
         # are actually used.
-        mask = pred_peaks_count != 0
+        mask = (pred_peaks_count != 0) & (peaks_count != 0)
         self.peaks_delta = np.mean(np.abs(pred_peaks_count[mask] - peaks_count[mask]))
         # Now, let's also find the avg distance from a predicted peak, to a
         # neighboring peak

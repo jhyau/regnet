@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import subprocess
 
 import util.diff_util as du
 import util.peak_util as pu
@@ -129,22 +130,23 @@ def gen_waveform_waveglow(args, save_path, c, device):
     audio = audio.cpu().numpy()
     audio = audio.astype('int16')
     write(save_path, args.sampling_rate, audio)
-    print(save_path)
+    # print(save_path)
+    return save_path
 
-def visualize_results(outdir, videoname, pred_mel, gt_mel, postnet_mel, step_size, step, num_plots, suffix='.png'):
+def visualize_results(outdir, videoname, pred_mel, gt_mel, postnet_mel, diff_im,
+                      peaks_im, step_size, step, num_plots, suffix='.png'):
     """visualize the outputs"""
-    h, w = gt_mel.shape
 
     if step == -1:
         # This means use the whole image
         parts = ''
         part_label = ''
         start = 0
-        end = w
+        end = pred_mel.shape[1] # |w|
     else:
         start = int(step*step_size)
         end = int(start + step_size)
-        parts = "_part{step+1}_of_{num_plots}.jpg"
+        parts = f"_part{step+1}_of_{num_plots}"
         part_label = "_predict_part" + str(step+1)
 
     plt.figure(figsize=(8, 9))
@@ -181,8 +183,7 @@ def visualize_results(outdir, videoname, pred_mel, gt_mel, postnet_mel, step_siz
     plt.subplot(312)
 
     # Print the visualization of the diff
-    diff_img = du.diff_image(pred_mel, gt_mel)
-    plt.imshow(diff_img[:,start:end], aspect='auto', origin='lower')
+    plt.imshow(diff_im[:,start:end], aspect='auto', origin='lower')
     plt.xlabel('Time(s)')
     plt.ylabel('mel bucket intensity diff')
     plt.title('diff of intensities. red: pred > gt. blue: gt > pred')
@@ -192,15 +193,34 @@ def visualize_results(outdir, videoname, pred_mel, gt_mel, postnet_mel, step_siz
     plt.savefig(os.path.join(outdir, videoname + parts + '.diff' + suffix))
     plt.close()
     
-    _, pred_peaks = pu.count_peaks(pred_mel)
-    _, gt_peaks = pu.count_peaks(gt_mel)
-    peaks_img = pu.peaks_diff_image(pred_peaks, gt_peaks, h, w)
-    plt.imshow(peaks_img[:,start:end], aspect='auto', origin='lower')
+    # Print the visualization of the diff on its own.
+    plt.imshow(diff_im[:,start:end], aspect='auto', origin='lower')
+    plt.xlabel('Time(s)')
+    plt.ylabel('mel bucket intensity diff')
+    plt.title('diff of intensities. red: pred > gt. blue: gt > pred')
+    plt.savefig(os.path.join(outdir, videoname + parts + '.rawdiff' + suffix))
+    plt.close()
+    
+    plt.imshow(peaks_im[:,start:end], aspect='auto', origin='lower')
     plt.xlabel('Time(s)')
     plt.ylabel('Peak/Impact (binary). upper: gt, lower: pred')
     plt.savefig(os.path.join(outdir, videoname + parts + '.peaks' + suffix))
     plt.close()
 
+def gen_video(wav, out, src):
+    cmd = ['ffmpeg', '-y', '-i', src, '-i',
+           wav, '-c:v', 'copy', '-map', '0:v:0',
+           '-map', '1:a:0', out]
+    # print(cmd)
+    subprocess.run(cmd, check=True)
+
+def gen_video_path(path):
+    return path.replace('.wav', '.mp4')
+
+def gen_video_src_path(config, vname):
+    p = os.path.join(config.video_dir, '%s.mp4' % vname)
+    assert os.path.exists(p), '%r does not exist lo' % p
+    return p
 
 def test_model(args, config):
     torch.manual_seed(config.seed)
@@ -229,22 +249,29 @@ def test_model(args, config):
                 #    model.forward_pairing_loss()
                 model.parse_batch(batch)
                 model.forward()            
-                for j in range(len(model.fake_B)):
+                for j in tqdm(range(len(model.fake_B))):
                     plt.figure(figsize=(8, 9))
                     plt.subplot(311)
                     pred_mel = model.fake_B[j].data.cpu().numpy()
                     gt_mel = model.real_B[j].data.cpu().numpy()
                     postnet_mel = model.fake_B_postnet[j].data.cpu().numpy()
+                    # get peaks and diff imgs
+                    peaks_im = pu.peaks_diff_image_from_mel(pred_mel, gt_mel)
+                    diff_im = du.diff_image(pred_mel, gt_mel)
                     vname = model.video_name[j]
                     os.makedirs(config.save_dir, exist_ok=True)
-                    visualize_results(config.save_dir, vname, pred_mel, gt_mel, postnet_mel, step_size, -1, num_plots)
+                    visualize_results(config.save_dir, vname, pred_mel, gt_mel,
+                                      postnet_mel, diff_im, peaks_im, step_size,
+                                      -1, num_plots)
                     # Save a zoomed-in plot so time dim is stretched out
                     # Assuming the sample is 10 seconds, split to parts of 2 seconds
                     subdir = os.path.join(config.save_dir, vname + '.subplots')
                     # Move all cuts of plots to be in their own subdirectories
                     os.makedirs(subdir, exist_ok=True)
                     for step in range(num_plots):
-                        visualize_results(config.save_dir, vname, pred_mel, gt_mel, postnet_mel, step_size, step, num_plots)
+                        visualize_results(subdir, vname, pred_mel,
+                                          gt_mel, postnet_mel, diff_im,
+                                          peaks_im, step_size, step, num_plots)
 
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
                     file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
@@ -278,8 +305,13 @@ def test_model(args, config):
                             gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
                         else:
                             # print('For waveglow, run inference separately')
-                            gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
-                            gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
+                            # |vsp| is video source path
+                            vsp = gen_video_src_path(config, model.video_name[j])
+                            # |wfp| is wave form path
+                            wfp = gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
+                            gen_video(wfp, gen_video_path(save_path_gt), vsp)
+                            wfp = gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
+                            gen_video(wfp, gen_video_path(save_path_pred), vsp)
                     else:
                         if args.gt:
                             print("using ground truth melspectrograms for vocoder inference...")
@@ -308,8 +340,8 @@ if __name__ == '__main__':
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow', default=True)
     parser.add_argument('--num_plots', default=10, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
-    parser.add_argument('--gt', action='store_true', help='generate only ground truth audio')
-    parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio')
+    parser.add_argument('--gt', action='store_true', help='generate only ground truth audio', default=False)
+    parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio', default=True)
     #parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
     #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to include landmarks in features')
     parser.add_argument("opts", default=None, nargs=argparse.REMAINDER)

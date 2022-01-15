@@ -208,8 +208,17 @@ def train(args):
                         print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} temporal:{:.6f} D:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
                         epoch, i, reduced_loss, model.loss_G, model.loss_temporal, model.loss_D, model.loss_G_silence, duration))
                     else:
-                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} temporal:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
-                        epoch, i, reduced_loss, model.loss_G, model.loss_temporal, model.loss_G_silence, duration))
+                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} G(w/w):{:.6f} temporal:{:.6f} temporal(w/w):{:.6f} t_aligned:{:.6f} t_misaligned:{:.6f} time:{:.2f}s/it".format(
+                               epoch,
+                               i,
+                               reduced_loss,
+                               model.loss_G,
+                               model.loss_G * model.config.lambda_Oriloss,
+                               model.loss_temporal,
+                               model.loss_temporal * model.config.temporal_alignment_lambda,
+                               model.loss_D_real,
+                               model.loss_D_fake,
+                               duration))
                 else:
                     print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
                         epoch, i, reduced_loss, model.loss_G, model.loss_D, (model.pred_real - model.pred_fake).mean(), model.loss_G_silence, duration))

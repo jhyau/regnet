@@ -26,6 +26,13 @@ def count_peaks(spectrogram, threshold_to_max=0.5):
 pred_color = 2 # Blue for predicted peaks
 gt_color = 0 # Red for gt peaks
 
+def peaks_diff_image_from_mel(pred_mel, gt_mel):
+    """easier usage of the function below."""
+    h, w = pred_mel.shape
+    _, pred_peaks = count_peaks(pred_mel)
+    _, gt_peaks = count_peaks(gt_mel)
+    return peaks_diff_image(pred_peaks, gt_peaks, h, w)
+
 def peaks_diff_image(pred_peaks, peaks, height, width):
     """Generate a peak visualization to see how far off they are."""
     img = np.ones((height, width, 3))

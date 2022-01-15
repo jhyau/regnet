@@ -33,6 +33,8 @@ class RegnetLoader(torch.utils.data.Dataset):
         self.reduced_video_samples = config.reduced_video_samples
         self.reduced_mel_samples = config.reduced_mel_samples
         self.video_fps = config.video_fps
+        self.mel_to_vid = config.mel_to_vid
+        self.mis_overlap = config.mis_overlap
         # This list is used when generating *non* randomized samples as a substitute
         # for aligner.
         self._non_rand_sample_idx = [(0, self.num_misalign_frames),
@@ -56,10 +58,9 @@ class RegnetLoader(torch.utils.data.Dataset):
 
             window_size = self.reduced_video_samples
             num_frames, _ = im.shape
-            misaligned = self.temporal_misalign_neg_samples_per_pos
             for i in range(self.temporal_misalign_pos_samples):
                 if self.randomize_samples:
-                    start_idx, mis_idx = aligner.get_misaligned_starts(num_frames, window_size, misaligned)
+                    start_idx, mis_idx = aligner.get_misaligned_starts(num_frames, window_size, max_overlap=self.mis_overlap)
                 else:
                     start_idx, mis_idx = self._non_rand_sample_idx[i]
 
@@ -156,9 +157,8 @@ class RegnetLoader(torch.utils.data.Dataset):
         """Expected dimensions for mel spectrogram: (n_mel_channels, mel_samples)"""
         # Note that for 44100 audio sampling rate, 1720 mel samples, 172 is one second
         # These videos are 21.5 fps, so the seconds are reduced_video_samples / 21.5
-        one_second = self.mel_samples / self.audio_samples
-        mel_center_start = int(round((start_frame / self.video_fps) * one_second))
-        mel_center_end = int(round(((start_frame+self.reduced_video_samples) / self.video_fps) * one_second))
+        mel_center_start = start_frame * self.mel_to_vid
+        mel_center_end = end_frame * self.mel_to_vid 
 
         # Force the mel spectrogram to match mel_samples shape
         #if (mel_center_end - mel_center_start) > self.reduced_mel_samples:
@@ -166,6 +166,7 @@ class RegnetLoader(torch.utils.data.Dataset):
 
         #print(f"mel start: {mel_center_start} and mel end: {mel_center_end}")
         mel_center = mel[:, mel_center_start:mel_center_end]
+        assert mel_center.shape[1] == self.reduced_mel_samples 
         return mel_center
 
     def __getitem__(self, index):

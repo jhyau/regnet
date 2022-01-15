@@ -1,4 +1,5 @@
 from yacs.config import CfgNode as CN
+import math
 
 _C  =  CN()
 _C.epochs = 2 # Use this one for tiny experiments
@@ -15,6 +16,7 @@ _C.exp_number = -1
 _C.exp_prefix = 'exp'
 _C.exp_tag = 'This is the default tag. Overwrite to keep track what you are testing'
 _C.save_dir = 'ckpt/dog'
+_C.video_dir = "/juno/u/jyau/regnet/data/features/ASMR/asmr_both_vids/videos_10s"
 # Note: |exp_number| is used to create/reuse a directory within |save_dir|. -1 will generate a new
 # with the first open number.
 
@@ -33,15 +35,18 @@ _C.audio_samples = 10  # Number of seconds of audio
 _C.mel_samples = 1720 # Original mel samples to match 22050 audio sampling rate: 860
 _C.visual_dim = 2048  # Feature vector length. 1024 (rgb) + 1024 (flow) = 2048. becomes 3072 if include landmark feature vector
 _C.n_mel_channels = 80
+# This might be inaccurate if they don't divide cleanly. Please make sure they do.
+_C.mel_to_vid = _C.mel_samples // _C.video_samples
+_C.mis_overlap = 0
 
 # Including pairing/misalignment loss
 _C.video_fps = 21.5 # Video fps. Default is 21.5, but for asmr videos, it actually is 30
 _C.pairing_loss = True
 _C.randomize_subset_samples = True # Toggle this to make random cuts for misalignment vs pre-defined cuts at 0, self.num_misaligned_frames and 2*num_misaligned_frames
 _C.num_misalign_frames = 43
-_C.reduced_video_samples = 107 # Reduced number of frames to allow misaligning
-_C.reduced_mel_samples = 864 # Corresponding reduced time dimension of mel spectrogram
-_C.temporal_alignment_lambda = 1.0 # Weight for temporal loss
+_C.reduced_video_samples = _C.video_samples // 10 * 3 # Make it a (roughly) 3s chunk.
+_C.reduced_mel_samples = _C.reduced_video_samples * _C.mel_to_vid # Corresponding reduced time dimension of mel spectrogram
+_C.temporal_alignment_lambda = 2.0 # Weight for temporal loss
 _C.allow_temporal_misalign_overlap = True # Allow the misalignment in negative samples to overlap
 _C.temporal_misalign_pos_samples = 3 # How many examples of 'aligned' snippets we want
 _C.temporal_misalign_neg_samples_per_pos = 2 # How many negative examples to gen per positive example

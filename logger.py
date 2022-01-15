@@ -12,7 +12,11 @@ class RegnetLogger(SummaryWriter):
         self.add_scalar("training.loss", reduced_loss, iteration)
         self.add_scalar("learning.rate", learning_rate, iteration)
         self.add_scalar("training.loss_G", model.loss_G, iteration)
+        self.add_scalar("training.loss_G weighted", model.loss_G * model.config.lambda_Oriloss, iteration)
         self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
+        self.add_scalar("training.loss_temporal weighted", model.loss_temporal * model.config.temporal_alignment_lambda, iteration)
+        self.add_scalar("training.loss_temporal_align", model.loss_D_real, iteration)
+        self.add_scalar("training.loss_temporal_misalign", model.loss_D_fake, iteration)
         self.add_scalar("training.peaks_delta", model.peaks_delta, iteration)
         self.add_scalar("training.peaks_offset", model.peaks_offset, iteration)
 
