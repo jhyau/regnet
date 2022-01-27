@@ -16,8 +16,8 @@ from tqdm import tqdm
 from wavenet_vocoder import builder
 # waveglow vocoder imports
 import json
-sys.path.append('./waveglow/')
-sys.path.append('./waveglow/tacotron2/')
+sys.path.append(os.path.join(os.path.dirname(__file__),'./waveglow'))
+sys.path.append(os.path.join(os.path.dirname(__file__),'./waveglow/tacotron2'))
 from scipy.io.wavfile import write
 from waveglow.denoiser import Denoiser
 from waveglow.mel2samp import files_to_list, MAX_WAV_VALUE
@@ -118,12 +118,17 @@ def gen_waveform_waveglow(args, save_path, c, device):
     print(save_path)
 
 
-def generate_audio_waveglow(mel_files_path, waveglow_checkpoint, output_path, sampling_rate, sigma):
+def generate_audio_waveglow(mel_files_path, waveglow_checkpoint, output_path, sampling_rate, sigma, is_fp16=True):
     """
     Call the inference.py file in the waveglow submodule to generate wave from mel spectrograms
     python waveglow/inference.py -f <file path to mel_files.txt> -w <path to waveglow checkpoint> -o <output path> --sampling_rate 44100 --is_fp16
     """
-    os.system(f"python waveglow/inference.py -f {mel_files_path} -w {waveglow_checkpoint} -o {output_path} --sampling_rate {sampling_rate} -s {sigma} --is_fp16")
+    if is_fp16:
+        command = f"python waveglow/inference.py -f {mel_files_path} -w {waveglow_checkpoint} -o {output_path} --sampling_rate {sampling_rate} -s {sigma} --is_fp16"
+    else:
+        command = f"python waveglow/inference.py -f {mel_files_path} -w {waveglow_checkpoint} -o {output_path} --sampling_rate {sampling_rate} -s {sigma}"
+    print(f"Running command: {command}")
+    os.system(command)
     
 
 def test_model(args, config):
@@ -223,8 +228,8 @@ def test_model(args, config):
                         plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}_of_{num_plots}.jpg"))
                         plt.close()
 
-                    file.write('../'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
-                    file.write('../'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
+                    file.write('./'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
+                    file.write('./'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
                     
                     # Saving the model prediction mel spec as numpy file
                     np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
@@ -236,6 +241,7 @@ def test_model(args, config):
                     #np.save(os.path.join(config.save_dir, model.video_name[j]+"_postnet.npy"),
                     #        model.fake_B_postnet[j].data.cpu().numpy())
                     # Using the prediction mel spectrogram to generate sound
+
                     if args.gt:
                         print("using ground truth melspectrograms for vocoder inference...")
                         mel_spec = model.real_B[j].data.cpu().numpy()
@@ -254,7 +260,8 @@ def test_model(args, config):
                             gen_waveform(wavenet_model, save_path_gt, mel_spec_gt, device, args)
                             gen_waveform(wavenet_model, save_path_pred, mel_spec_pred, device, args)
                         else:
-                            print('For waveglow, run inference separately')
+                            print('Will run through waveglow after all inferences are done')
+                            
                             #gen_waveform_waveglow(args, save_path_gt, mel_spec_gt, device)
                             #gen_waveform_waveglow(args, save_path_pred, mel_spec_pred, device)
                     else:
@@ -269,7 +276,7 @@ def test_model(args, config):
                         if args.vocoder == 'wavenet':
                             gen_waveform(wavenet_model, save_path, mel_spec, device, args)
                         else:
-                            print("Not immediately generating audio with waveglow")
+                            print("Generating audio with waveglow after all inferences are done...")
                             #gen_waveform_waveglow(args, save_path, mel_spec, device)
     model.train()
 
@@ -280,7 +287,7 @@ if __name__ == '__main__':
                         help='file for configuration')
     parser.add_argument('--waveglow_path', type=str, default='./pretrained_waveglow/published_ver/waveglow_256channels_universal_v5.pt', help='The path to waveglow checkpoint to load. Currently default is set to Waveglow published weights')
     parser.add_argument('--waveglow_config', type=str, default='./pretrained_waveglow/config.json', help='Config file for waveglow vocoder to load')
-    parser.add_argument('--sigma', default=2.0, type=float)
+    parser.add_argument('--sigma', default=1.0, type=float)
     parser.add_argument('--sampling_rate', default=44100, type=int)
     parser.add_argument('--denoiser_strength', default=0.0, type=float, help='Removes model bias. Start with 0.1 and adjust')
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
@@ -306,4 +313,12 @@ if __name__ == '__main__':
     print("cuDNN Enabled:", config.cudnn_enabled)
     print("cuDNN Benchmark:", config.cudnn_benchmark)
 
+    # Running inference to output mel spectrograms
     test_model(args, config)
+
+    if args.vocoder == 'waveglow':
+        # Paths needed for audio generation
+        mel_files_path = os.path.join(config.save_dir, 'mel_files.txt')
+    
+        # Running mel spectorgrams through the waveglow
+        generate_audio_waveglow(mel_files_path, args.waveglow_path, config.save_dir, args.sampling_rate, args.sigma, is_fp16=args.is_fp16)
