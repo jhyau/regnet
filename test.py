@@ -21,7 +21,7 @@ sys.path.append('./waveglow/tacotron2/')
 from scipy.io.wavfile import write
 from waveglow.denoiser import Denoiser
 from waveglow.mel2samp import files_to_list, MAX_WAV_VALUE
-from waveglow.train import load_checkpoint
+#from waveglow.train import load_checkpoint
 from waveglow.glow import WaveGlow, WaveGlowLoss
 
 def build_wavenet(checkpoint_path=None, device='cuda:0'):
@@ -116,6 +116,15 @@ def gen_waveform_waveglow(args, save_path, c, device):
     audio = audio.astype('int16')
     write(save_path, args.sampling_rate, audio)
     print(save_path)
+
+
+def generate_audio_waveglow(mel_files_path, waveglow_checkpoint, output_path, sampling_rate, sigma):
+    """
+    Call the inference.py file in the waveglow submodule to generate wave from mel spectrograms
+    python waveglow/inference.py -f <file path to mel_files.txt> -w <path to waveglow checkpoint> -o <output path> --sampling_rate 44100 --is_fp16
+    """
+    os.system(f"python waveglow/inference.py -f {mel_files_path} -w {waveglow_checkpoint} -o {output_path} --sampling_rate {sampling_rate} -s {sigma} --is_fp16")
+    
 
 def test_model(args, config):
     torch.manual_seed(config.seed)
