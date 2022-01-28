@@ -190,6 +190,19 @@ save_dir ckpt/dog/inference_result \
 wavenet_path /path/to/wavenet_dog.pth
 ```
 
+
+Running inference with waveglow audio generation
+```bash
+python test.py --vocoder waveglow --waveglow_path /juno/group/SoundProject/WaveGlowWeights/TrainAll/checkpoints/waveglow_152500 --sampling_rate 44100 --is_fp16 --num_plots 3 --gt -c ckpt/asmr_full_no_GAN_loss/opts.yml aux_zero True checkpoint_path ckpt/asmr_full_no_GAN_loss/checkpoint_004900 save_dir ckpt/asmr_full_no_GAN_loss/inf_val_best_waveglow_trainall
+```
+
+
+
+Replacing the audio of a given video with another audio
+```bash
+python replace_audio_of_video.py single data/features/ASMR/asmr_both_vids/videos_10s_21.5fps/ASMR_Addictive_Tapping_1_Hr_No_Talking-58-of-365.mp4 ckpt/asmr_full_no_GAN_loss/inf_val_best_waveglow_trainall/ASMR_Addictive_Tapping_1_Hr_No_Talking-58-of-365_synthesis.wav ckpt/asmr_full_no_GAN_loss/inf_val_best_waveglow_trainall/ 
+```
+
 Enjoy your experiments!
 
 

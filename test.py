@@ -228,8 +228,11 @@ def test_model(args, config):
                         plt.savefig(os.path.join(config.save_dir, model.video_name[j]+f"_part{step}_of_{num_plots}.jpg"))
                         plt.close()
 
-                    file.write('./'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
-                    file.write('./'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
+                    if args.gt_and_pred or args.pred:
+                        file.write('./'+os.path.join(config.save_dir, model.video_name[j]+".npy \n"))
+
+                    if args.gt_and_pred or args.gt:
+                        file.write('./'+os.path.join(config.save_dir, model.video_name[j]+"_gt.npy \n"))
                     
                     # Saving the model prediction mel spec as numpy file
                     np.save(os.path.join(config.save_dir, model.video_name[j]+".npy"), 
@@ -293,6 +296,7 @@ if __name__ == '__main__':
     parser.add_argument('--is_fp16', action='store_true', help='Use the apex library to do mixed precision for waveglow')
     parser.add_argument('--num_plots', default=35, type=int, help='How many smaller plots to split the time dimension of the mel spectrogram plots')
     parser.add_argument('--gt', action='store_true', help='generate only ground truth audio')
+    parser.add_argument('--pred', action='store_true', help='Generate only prediction audio')
     parser.add_argument('--gt_and_pred', action='store_true', help='generate both ground truth and prediction audio')
     #parser.add_argument('--extra_upsampling', action='store_true', help='include this flag to add extra upsampling layers to decoder and discriminator to match 44100 audio sample rate')
     #parser.add_argument('--include_landmarks', action='store_true', help='Include flag to include landmarks in features')
