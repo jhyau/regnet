@@ -2,10 +2,11 @@ import random
 from torch.utils.tensorboard import SummaryWriter
 
 class RegnetLogger(SummaryWriter):
-    def __init__(self, logdir, exclude_D_r_f=False, exclude_gan_loss=False):
+    def __init__(self, logdir, exclude_D_r_f=False, exclude_gan_loss=False, exclude_loss_temp=False):
         super(RegnetLogger, self).__init__(logdir)
         self.exclude_D_r_f = exclude_D_r_f
         self.exclude_gan_loss = exclude_gan_loss
+        self.exclude_loss_temp = exclude_loss_temp
 
     def log_training(self, model, reduced_loss, learning_rate, duration,
                      iteration):
@@ -13,12 +14,15 @@ class RegnetLogger(SummaryWriter):
         self.add_scalar("learning.rate", learning_rate, iteration)
         self.add_scalar("training.loss_G", model.loss_G, iteration)
         self.add_scalar("training.loss_G weighted", model.loss_G * model.config.lambda_Oriloss, iteration)
-        self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
-        self.add_scalar("training.loss_temporal weighted", model.loss_temporal * model.config.temporal_alignment_lambda, iteration)
-        self.add_scalar("training.loss_temporal_align", model.loss_D_real, iteration)
-        self.add_scalar("training.loss_temporal_misalign", model.loss_D_fake, iteration)
-        self.add_scalar("training.peaks_delta", model.peaks_delta, iteration)
-        self.add_scalar("training.peaks_offset", model.peaks_offset, iteration)
+        
+        if not self.exclude_loss_temp:
+            self.add_scalar("training.loss_temporal", model.loss_temporal, iteration)
+            self.add_scalar("training.loss_temporal weighted", model.loss_temporal * model.config.temporal_alignment_lambda, iteration)
+            self.add_scalar("training.peaks_delta", model.peaks_delta, iteration)
+            self.add_scalar("training.peaks_offset", model.peaks_offset, iteration)
+        if not self.exclude_gan_loss:
+            self.add_scalar("training.loss_temporal_align", model.loss_D_real, iteration)
+            self.add_scalar("training.loss_temporal_misalign", model.loss_D_fake, iteration)
 
         #if not self.exclude_gan_loss:
         #    self.add_scalar("training.loss_G_GAN", model.loss_G_GAN, iteration)
@@ -37,8 +41,9 @@ class RegnetLogger(SummaryWriter):
 
     def log_testing(self, reduced_loss, model, epoch):
         self.add_scalar("testing.loss", reduced_loss, epoch)
-        self.add_scalar("testing.peaks_delta", model.peaks_delta, epoch)
-        self.add_scalar("testing.peaks_offset", model.peaks_offset, epoch)
+        if not self.exclude_loss_temp:
+            self.add_scalar("testing.peaks_delta", model.peaks_delta, epoch)
+            self.add_scalar("testing.peaks_offset", model.peaks_offset, epoch)
 
     def log_plot(self, model, iteration, split="train"):
         output = model.fake_B

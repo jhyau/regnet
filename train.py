@@ -151,7 +151,7 @@ def train(args):
 
     criterion = RegnetLoss(config.loss_type)
 
-    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f, exclude_gan_loss=config.exclude_gan_loss)
+    logger = RegnetLogger(os.path.join(config.save_dir, 'logs'), exclude_D_r_f=config.exclude_D_r_f, exclude_gan_loss=config.exclude_gan_loss, exclude_loss_temp=(config.pairing_loss == False))
 
     train_loader, test_loader = prepare_dataloaders(args)
 
@@ -220,8 +220,12 @@ def train(args):
                                model.loss_D_fake,
                                duration))
                 else:
-                    print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                    if not config.wo_G_GAN:
+                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} D:{:.6f} D_r-f:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
                         epoch, i, reduced_loss, model.loss_G, model.loss_D, (model.pred_real - model.pred_fake).mean(), model.loss_G_silence, duration))
+                    else:
+                        print("epoch:{} iter:{} loss:{:.6f} G:{:.6f} G_s:{:.6f} time:{:.2f}s/it".format(
+                        epoch, i, reduced_loss, model.loss_G, model.loss_G_silence, duration))
                 logger.log_training(model, reduced_loss, learning_rate, duration, iteration)
 
             iteration += 1
