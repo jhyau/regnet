@@ -325,6 +325,7 @@ class Encoder(nn.Module):
 
         # For classification, don't need to go through BiLISTM
         if not config.use_lstm:
+            print(f"Not using the LSTM...")
             return x
 
         x, _ = self.BiLSTM(x)
