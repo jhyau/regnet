@@ -996,7 +996,7 @@ class Regnet_D(nn.Module):
         #print(f"discriminator output final shape: {out.shape}")
         
         if not config.pairing_loss:
-            print("Using sigmoid for discriminator output...")
+            #print("Using sigmoid for discriminator output...")
             out = nn.Sigmoid()(out) # Needed if using BCELoss, but sigmoid is already included in BCELossWithLogits
         return out
 
